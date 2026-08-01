@@ -1,0 +1,653 @@
+<title>FredCast — Visuell prototyp</title>
+<style>
+  :root {
+    --bg: #0B0B10;
+    --surface: #17161D;
+    --surface-2: #1F1E27;
+    --text: #F3F1EE;
+    --text-dim: #9B98A6;
+    --text-faint: #6E6B78;
+    --accent: #7C6FEE;
+    --accent-ink: #FFFFFF;
+    --ready: #35D28A;
+    --connecting: #E8B84B;
+    --border: rgba(255,255,255,0.09);
+    --shadow: 0 20px 50px rgba(0,0,0,0.45);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --radius-sm: 10px;
+
+    --font-display: -apple-system, "SF Pro Display", "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    --font-body: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #FAF9F7;
+      --surface: #FFFFFF;
+      --surface-2: #F1EFEA;
+      --text: #17151F;
+      --text-dim: #66636F;
+      --text-faint: #9A97A1;
+      --accent: #6552E0;
+      --accent-ink: #FFFFFF;
+      --ready: #128F63;
+      --connecting: #9C6D0E;
+      --border: rgba(20,16,30,0.09);
+      --shadow: 0 20px 50px rgba(30,20,10,0.12);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #FAF9F7;
+    --surface: #FFFFFF;
+    --surface-2: #F1EFEA;
+    --text: #17151F;
+    --text-dim: #66636F;
+    --text-faint: #9A97A1;
+    --accent: #6552E0;
+    --accent-ink: #FFFFFF;
+    --ready: #128F63;
+    --connecting: #9C6D0E;
+    --border: rgba(20,16,30,0.09);
+    --shadow: 0 20px 50px rgba(30,20,10,0.12);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B0B10;
+    --surface: #17161D;
+    --surface-2: #1F1E27;
+    --text: #F3F1EE;
+    --text-dim: #9B98A6;
+    --text-faint: #6E6B78;
+    --accent: #7C6FEE;
+    --accent-ink: #FFFFFF;
+    --ready: #35D28A;
+    --connecting: #E8B84B;
+    --border: rgba(255,255,255,0.09);
+    --shadow: 0 20px 50px rgba(0,0,0,0.45);
+  }
+
+  * { box-sizing: border-box; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    overflow-x: hidden;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 64px 28px 96px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    font-size: clamp(2rem, 4vw, 2.9rem);
+    text-wrap: balance;
+    margin: 10px 0 8px;
+  }
+
+  .lede {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    max-width: 62ch;
+    margin: 0 0 44px;
+  }
+
+  section { margin-top: 72px; }
+
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  .section-note {
+    color: var(--text-dim);
+    font-size: 0.94rem;
+    max-width: 60ch;
+    margin: 0 0 28px;
+  }
+
+  /* ---- Design tokens strip ---- */
+  .tokens {
+    display: grid;
+    grid-template-columns: 1.1fr 1.4fr;
+    gap: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+  }
+  @media (max-width: 800px) { .tokens { grid-template-columns: 1fr; } }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 14px; }
+  .swatch { width: 92px; }
+  .swatch-chip {
+    height: 60px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .swatch-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    display: block;
+  }
+  .swatch-name { font-size: 0.78rem; color: var(--text); display:block; margin-top: 2px;}
+
+  .type-specimen .t-display {
+    font-family: var(--font-display); font-weight: 650; letter-spacing: -0.02em;
+    font-size: 1.9rem; margin: 0 0 2px;
+  }
+  .type-specimen .t-body { font-family: var(--font-body); font-size: 1rem; color: var(--text-dim); margin: 0 0 10px; max-width: 46ch;}
+  .type-specimen .t-mono {
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-faint);
+    letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  }
+  .type-specimen .t-caption {
+    font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--accent); margin-bottom: 6px; display:block;
+  }
+
+  /* ---- Flow diagrams ---- */
+  .flows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .flows { grid-template-columns: 1fr; } }
+  .flow-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 22px 22px 8px;
+  }
+  .flow-card h3 {
+    font-family: var(--font-display); font-size: 1.02rem; font-weight: 650;
+    margin: 0 0 2px;
+  }
+  .flow-card .flow-sub { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 8px; }
+  .flow-card pre.mermaid { background: transparent; }
+
+  /* ---- Phone gallery ---- */
+  .gallery-scroll {
+    display: flex;
+    gap: 28px;
+    overflow-x: auto;
+    padding: 12px 4px 28px;
+    scroll-snap-type: x proximity;
+  }
+  .frame-block { flex: 0 0 auto; scroll-snap-align: start; width: 300px; }
+  .frame-label {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 14px;
+  }
+  .frame-label b { color: var(--text); font-weight: 600; }
+
+  .phone {
+    width: 300px;
+    height: 636px;
+    background: var(--surface-2);
+    border-radius: 42px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+  }
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    border-radius: 30px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px 4px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .statusbar .dots { display: flex; gap: 4px; align-items: center; }
+  .statusbar .dots span { width: 3px; height: 8px; background: var(--text-dim); border-radius: 1px; }
+
+  .screen-body { flex: 1; padding: 14px 18px 0; overflow: hidden; display: flex; flex-direction: column; }
+
+  .home-indicator {
+    width: 110px; height: 4px; background: var(--text-faint);
+    border-radius: 3px; margin: 10px auto 8px; opacity: 0.5;
+  }
+
+  .greet { color: var(--text-dim); font-size: 0.82rem; margin: 4px 0 2px; }
+  .greet-title { font-family: var(--font-display); font-weight: 650; font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 16px; }
+
+  .primary-card {
+    background: linear-gradient(155deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #1b1730));
+    color: var(--accent-ink);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .primary-card .pc-eyebrow { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+  .primary-card .pc-title { font-family: var(--font-display); font-weight: 650; font-size: 1.2rem; margin: 4px 0 14px; }
+  .primary-card .pc-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.18);
+    padding: 9px 16px; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+  }
+
+  .row-label {
+    font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-faint); margin: 4px 0 8px;
+  }
+  .thumb-row { display: flex; gap: 8px; margin-bottom: 18px; }
+  .thumb {
+    width: 56px; height: 56px; border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .group-label { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 0.78rem; margin: 14px 0 8px; }
+  .group-label svg { width: 13px; height: 13px; }
+
+  .device-card {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px;
+  }
+  .device-icon {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .device-icon svg { width: 18px; height: 18px; color: var(--text); }
+  .device-meta { flex: 1; min-width: 0; }
+  .device-name { font-size: 0.88rem; font-weight: 600; }
+  .device-status { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: var(--text-dim); margin-top: 1px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ready); flex-shrink:0; }
+  .status-dot.connecting { background: var(--connecting); }
+  .status-dot.hollow { background: transparent; border: 1.5px solid var(--text-faint); }
+  .pin-star { color: var(--accent); width: 14px; height:14px; }
+
+  .segmented {
+    display: flex; background: var(--surface); border-radius: 999px; padding: 3px;
+    margin-bottom: 14px; border: 1px solid var(--border);
+  }
+  .segmented span {
+    flex: 1; text-align: center; font-size: 0.76rem; padding: 7px 0; border-radius: 999px; color: var(--text-dim);
+  }
+  .segmented span.active { background: var(--surface-2); color: var(--text); font-weight: 600; }
+
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .photo-grid .ph {
+    aspect-ratio: 1; border-radius: 6px;
+  }
+  .ph1 { background: linear-gradient(160deg,#e8a86c,#c9694f); }
+  .ph2 { background: linear-gradient(160deg,#6c9ce8,#3a4f8c); }
+  .ph3 { background: linear-gradient(160deg,#7fd6b0,#2f7d63); }
+  .ph4 { background: linear-gradient(160deg,#e0c265,#a8763a); }
+  .ph5 { background: linear-gradient(160deg,#c98ce0,#6b3f8c); }
+  .ph6 { background: linear-gradient(160deg,#8c8c98,#3f3f4c); }
+
+  .bottom-nav {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 10px 6px 4px; border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-faint); }
+  .nav-item svg { width: 19px; height: 19px; }
+  .nav-item.active { color: var(--accent); }
+  .nav-item span { font-size: 0.6rem; }
+
+  .cast-bubble {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 12px 7px 8px; margin: 0 0 8px;
+    font-size: 0.72rem;
+  }
+  .cast-bubble .cb-dot { width: 7px; height:7px; border-radius:50%; background: var(--ready); animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .cast-bubble .cb-thumb { width: 22px; height: 22px; border-radius: 6px; background: var(--surface-2); }
+  .cast-bubble b { font-weight: 600; }
+
+  /* dimmed backdrop + sheet for cast overlay screen */
+  .dim-backdrop { position: relative; flex: 1; }
+  .dim-backdrop::after {
+    content: ""; position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+  }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    background: var(--surface); border-radius: 22px 22px 0 0;
+    padding: 16px 20px 22px; border-top: 1px solid var(--border);
+  }
+  .sheet-handle { width: 34px; height: 4px; background: var(--text-faint); opacity: 0.5; border-radius: 3px; margin: 0 auto 14px; }
+  .sheet-thumb { width: 100%; height: 130px; border-radius: var(--radius-sm); background: linear-gradient(160deg,#6c9ce8,#3a4f8c); margin-bottom: 14px; }
+  .sheet-file { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 14px; }
+  .sheet-btn {
+    width: 100%; text-align: center; background: var(--accent); color: var(--accent-ink);
+    border-radius: 999px; padding: 13px; font-weight: 650; font-size: 0.92rem; margin-bottom: 10px;
+  }
+  .sheet-btn-secondary { width: 100%; text-align: center; color: var(--text-dim); font-size: 0.82rem; padding: 4px; }
+
+  /* now playing */
+  .np-art {
+    width: 100%; aspect-ratio: 1; border-radius: var(--radius-md);
+    background: linear-gradient(155deg,#3a4f8c,#0e1220); margin: 6px 0 18px;
+  }
+  .np-title { font-family: var(--font-display); font-weight: 650; font-size: 1.05rem; margin-bottom: 2px; }
+  .np-sub { color: var(--text-dim); font-size: 0.8rem; margin-bottom: 18px; }
+  .np-scrub { height: 3px; background: var(--surface-2); border-radius: 2px; margin-bottom: 6px; position: relative; }
+  .np-scrub::after { content:""; position:absolute; left:0; top:0; bottom:0; width: 38%; background: var(--accent); border-radius: 2px; }
+  .np-times { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-faint); font-variant-numeric: tabular-nums; margin-bottom: 20px; }
+  .np-controls { display: flex; align-items: center; justify-content: center; gap: 28px; margin-bottom: 20px; }
+  .np-controls svg { color: var(--text); }
+  .np-controls .np-play { width: 56px; height: 56px; border-radius: 50%; background: var(--text); display: flex; align-items: center; justify-content: center; }
+  .np-controls .np-play svg { color: var(--bg); width: 20px; height: 20px; }
+  .np-controls svg.small { width: 22px; height: 22px; }
+
+  /* empty state */
+  .empty-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 12px; }
+  .radar {
+    width: 96px; height: 96px; border-radius: 50%;
+    border: 1px solid var(--border); position: relative; margin-bottom: 22px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .radar::before, .radar::after {
+    content: ""; position: absolute; border-radius: 50%; border: 1px solid var(--border);
+  }
+  .radar::before { width: 66px; height: 66px; }
+  .radar::after { width: 38px; height: 38px; }
+  .radar svg { width: 22px; height: 22px; color: var(--text-faint); }
+  .empty-title { font-family: var(--font-display); font-weight: 650; font-size: 1.05rem; margin-bottom: 6px; }
+  .empty-sub { color: var(--text-dim); font-size: 0.82rem; max-width: 22ch; margin-bottom: 22px; }
+  .qr-btn { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 16px; }
+  .qr-mini { width: 28px; height: 28px; border-radius: 4px; background:
+    repeating-conic-gradient(var(--text) 0% 25%, transparent 0% 50%) 0 0/8px 8px;
+  }
+  .qr-btn span { font-size: 0.8rem; font-weight: 600; }
+
+  footer.note {
+    margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--border);
+    color: var(--text-faint); font-size: 0.82rem;
+  }
+  footer.note code { font-family: var(--font-mono); }
+</style>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-tv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4" stroke-linecap="round"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="2.5" width="14" height="19" rx="3"/><circle cx="12" cy="9" r="2.4"/><circle cx="12" cy="16" r="1.1"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="4.5" width="17" height="11" rx="1.5"/><path d="M2 19h20" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6.5 7-11.5A7 7 0 0 0 5 9.5C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.3 6.9.7-5.1 4.7 1.5 6.8L12 17.7 5.8 21l1.5-6.8-5.1-4.7 6.9-.7z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 11.5 12 4l8 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" stroke-linejoin="round"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.3"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.3"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.4M12 19.1v2.4M21.5 12h-2.4M4.9 12H2.5M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM19 5 8 12l11 7z"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24" fill="currentColor"><path d="M18 5h-2v14h2zM5 5l11 7-11 7z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.3-4.3" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="wrap">
+
+  <span class="eyebrow">FredCast — Universal Cast</span>
+  <h1>Från plan till pixlar</h1>
+  <p class="lede">Lo-fi visuell prototyp av de sju centrala skärmarna samt de tre huvudflödena
+  beskrivna i <code style="font-family: var(--font-mono); font-size:0.9em;">docs/PRODUCT_PLAN.md</code>.
+  Byggd i mörkt och ljust läge efter samma designtoken-system som ska styra den riktiga appen.</p>
+
+  <section id="tokens">
+    <h2>Designtoken-system</h2>
+    <p class="section-note">Sex namngivna kulörer och en typroll-uppdelning i tre — samma variabler
+    driver varje skärm nedan, i både mörkt och ljust läge.</p>
+    <div class="tokens">
+      <div class="swatches">
+        <div class="swatch"><div class="swatch-chip" style="background:var(--bg)"></div><span class="swatch-name">Bakgrund</span><span class="swatch-label">--bg</span></div>
+        <div class="swatch"><div class="swatch-chip" style="background:var(--surface)"></div><span class="swatch-name">Yta / kort</span><span class="swatch-label">--surface</span></div>
+        <div class="swatch"><div class="swatch-chip" style="background:var(--text)"></div><span class="swatch-name">Text</span><span class="swatch-label">--text</span></div>
+        <div class="swatch"><div class="swatch-chip" style="background:var(--accent)"></div><span class="swatch-name">Accent</span><span class="swatch-label">--accent</span></div>
+        <div class="swatch"><div class="swatch-chip" style="background:var(--ready)"></div><span class="swatch-name">Redo</span><span class="swatch-label">--ready</span></div>
+        <div class="swatch"><div class="swatch-chip" style="background:var(--connecting)"></div><span class="swatch-name">Ansluter</span><span class="swatch-label">--connecting</span></div>
+      </div>
+      <div class="type-specimen">
+        <span class="t-caption">Display · rubriker</span>
+        <p class="t-display">Vardagsrum är redo</p>
+        <span class="t-caption" style="margin-top:14px;">Body · brödtext &amp; UI</span>
+        <p class="t-body">Systemets nativa typsnitt bär hierarkin — premiumkänslan kommer av rytm och luft, inte av ett dyrt inköpt typsnitt.</p>
+        <span class="t-caption">Mono · status &amp; siffror</span>
+        <p class="t-mono">14:22 / 32:10 · 2,3 GB · SSDP+mDNS</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="flows">
+    <h2>Tre huvudflöden</h2>
+    <p class="section-note">A: första öppningen. B: dela-arket, det vardagliga flödet. C: återkommande användare, noll navigering.</p>
+    <div class="flows">
+      <div class="flow-card">
+        <h3>A · Första gången</h3>
+        <p class="flow-sub">≈20 sek, 6 tryck</p>
+<pre class="mermaid">
+flowchart TD
+    A[Öppna appen] --> B[Hitta skärmar]
+    B --> C[Sony BRAVIA hittad]
+    C --> D[Ansluter]
+    D --> E[Välj: Bilder / Video / Filer]
+    E --> F[Tryck på en bild]
+    F --> G[Visa på Vardagsrum]
+    G --> H[Visas på TV]
+</pre>
+      </div>
+      <div class="flow-card">
+        <h3>B · Dela-arket</h3>
+        <p class="flow-sub">≈3 sek, 2 tryck — den vardagliga vägen</p>
+<pre class="mermaid">
+flowchart TD
+    A[I Foton / Filer / Safari] --> B[Tryck Dela]
+    B --> C[Välj FredCast]
+    C --> D[Välj skärm i mini-ark]
+    D --> E[Castar direkt]
+</pre>
+      </div>
+      <div class="flow-card">
+        <h3>C · Återkommande</h3>
+        <p class="flow-sub">Noll navigering, ett tryck</p>
+<pre class="mermaid">
+flowchart TD
+    A[Öppna appen] --> B["Fortsätt till Vardagsrum"]
+    B --> C[Klart]
+</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens">
+    <h2>Skärmgalleri</h2>
+    <p class="section-note">Sju nyckelskärmar i flödesordning, från startsida till tomt läge. Skrolla i sidled.</p>
+
+    <div class="gallery-scroll">
+
+      <!-- 1. Hemskärm -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:04</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="greet">God kväll</p>
+            <p class="greet-title">Idag</p>
+            <div class="primary-card">
+              <div class="pc-eyebrow">Senast använd skärm</div>
+              <div class="pc-title">Fortsätt till Vardagsrum</div>
+              <div class="pc-btn"><svg width="14" height="14"><use href="#i-tv"/></svg> Visa innehåll</div>
+            </div>
+            <div class="row-label">Senast castat</div>
+            <div class="thumb-row">
+              <div class="thumb ph1"></div><div class="thumb ph2"></div><div class="thumb ph3"></div><div class="thumb ph4"></div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item active"><svg><use href="#i-home"/></svg><span>Idag</span></div>
+            <div class="nav-item"><svg><use href="#i-grid"/></svg><span>Bibliotek</span></div>
+            <div class="nav-item"><svg><use href="#i-tv"/></svg><span>Skärmar</span></div>
+            <div class="nav-item"><svg><use href="#i-gear"/></svg><span>Inst.</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>1. Idag</b> — hemskärm, en primär genväg</div>
+      </div>
+
+      <!-- 2. Enhetslista -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:04</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="greet-title" style="font-size:1.25rem;margin-bottom:14px;">Skärmar</p>
+            <div class="group-label"><svg><use href="#i-pin"/></svg> Vardagsrum</div>
+            <div class="device-card">
+              <div class="device-icon"><svg><use href="#i-tv"/></svg></div>
+              <div class="device-meta">
+                <div class="device-name">Sony BRAVIA</div>
+                <div class="device-status"><span class="status-dot"></span>Redo</div>
+              </div>
+              <svg class="pin-star"><use href="#i-star"/></svg>
+            </div>
+            <div class="device-card">
+              <div class="device-icon"><svg><use href="#i-speaker"/></svg></div>
+              <div class="device-meta">
+                <div class="device-name">Sonos Arc</div>
+                <div class="device-status"><span class="status-dot"></span>Redo</div>
+              </div>
+            </div>
+            <div class="group-label"><svg><use href="#i-pin"/></svg> Sovrum</div>
+            <div class="device-card">
+              <div class="device-icon"><svg><use href="#i-tv"/></svg></div>
+              <div class="device-meta">
+                <div class="device-name">Chromecast med Google TV</div>
+                <div class="device-status"><span class="status-dot"></span>Redo</div>
+              </div>
+            </div>
+            <div class="group-label"><svg><use href="#i-pin"/></svg> Andra skärmar</div>
+            <div class="device-card">
+              <div class="device-icon"><svg><use href="#i-laptop"/></svg></div>
+              <div class="device-meta">
+                <div class="device-name">Fredriks MacBook</div>
+                <div class="device-status"><span class="status-dot connecting"></span>Ansluter…</div>
+              </div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item"><svg><use href="#i-home"/></svg><span>Idag</span></div>
+            <div class="nav-item"><svg><use href="#i-grid"/></svg><span>Bibliotek</span></div>
+            <div class="nav-item active"><svg><use href="#i-tv"/></svg><span>Skärmar</span></div>
+            <div class="nav-item"><svg><use href="#i-gear"/></svg><span>Inst.</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>2. Skärmar</b> — grupperat per rum, inte per protokoll</div>
+      </div>
+
+      <!-- 3. Galleri -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:05</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="greet-title" style="font-size:1.25rem;margin-bottom:14px;">Bibliotek</p>
+            <div class="segmented"><span class="active">Bilder</span><span>Video</span><span>Filer</span><span>Musik</span></div>
+            <div class="cast-bubble">
+              <span class="cb-dot"></span>
+              <div class="cb-thumb"></div>
+              <span>Sänder till <b>Vardagsrum</b></span>
+            </div>
+            <div class="photo-grid">
+              <div class="ph ph1"></div><div class="ph ph2"></div><div class="ph ph3"></div>
+              <div class="ph ph4"></div><div class="ph ph5"></div><div class="ph ph6"></div>
+              <div class="ph ph2"></div><div class="ph ph4"></div><div class="ph ph1"></div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item"><svg><use href="#i-home"/></svg><span>Idag</span></div>
+            <div class="nav-item active"><svg><use href="#i-grid"/></svg><span>Bibliotek</span></div>
+            <div class="nav-item"><svg><use href="#i-tv"/></svg><span>Skärmar</span></div>
+            <div class="nav-item"><svg><use href="#i-gear"/></svg><span>Inst.</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>3. Bibliotek</b> — cast-bubblan syns på varje flik</div>
+      </div>
+
+      <!-- 4. Cast overlay -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:05</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="dim-backdrop">
+            <div class="screen-body" style="padding-top:14px;">
+              <div class="photo-grid">
+                <div class="ph ph1"></div><div class="ph ph2"></div><div class="ph ph3"></div>
+                <div class="ph ph4"></div><div class="ph ph5"></div><div class="ph ph6"></div>
+              </div>
+            </div>
+            <div class="sheet">
+              <div class="sheet-handle"></div>
+              <div class="sheet-thumb"></div>
+              <div class="sheet-file">IMG_0231.HEIC · 4,2 MB</div>
+              <div class="sheet-btn">Visa på Vardagsrum</div>
+              <div class="sheet-btn-secondary">Byt skärm</div>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>4. Cast-ark</b> — ett tryck när en skärm redan är vald</div>
+      </div>
+
+      <!-- 5. Now playing -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:06</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="row-label" style="margin-top:6px;">Nu visas</p>
+            <div class="np-art"></div>
+            <div class="np-title">Sommaren 2025 — Bildspel</div>
+            <div class="np-sub">Vardagsrum · Sony BRAVIA</div>
+            <div class="np-scrub"></div>
+            <div class="np-times"><span>00:38</span><span>01:42</span></div>
+            <div class="np-controls">
+              <svg class="small"><use href="#i-prev"/></svg>
+              <div class="np-play"><svg><use href="#i-play"/></svg></div>
+              <svg class="small"><use href="#i-next"/></svg>
+            </div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>5. Nu spelas</b> — samma vy oavsett protokoll bakom kulisserna</div>
+      </div>
+
+      <!-- 6. Tomt läge / QR -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:07</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="empty-wrap">
+            <div class="radar"><svg><use href="#i-search"/></svg></div>
+            <p class="empty-title">Inga skärmar hittade</p>
+            <p class="empty-sub">Kontrollera att telefon och TV är på samma Wi-Fi</p>
+            <div class="qr-btn"><div class="qr-mini"></div><span>Anslut med QR-kod istället</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>6. Tomt läge</b> — konkret hjälp, aldrig en död återvändsgränd</div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="note">
+    Alla skärmar delar samma tokens och komponenter — inget skärmspecifikt hack. Källa till
+    fullständig resonemang, funktionslistor och teknisk arkitektur: <code>docs/PRODUCT_PLAN.md</code>.
+  </footer>
+
+</div>
