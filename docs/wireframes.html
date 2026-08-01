@@ -379,6 +379,84 @@
   }
   .qr-btn span { font-size: 0.8rem; font-weight: 600; }
 
+  /* share extension sheet */
+  .browser-chrome {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border-radius: var(--radius-sm);
+    padding: 9px 12px; margin: 4px 0 14px;
+  }
+  .browser-chrome svg { width: 13px; height: 13px; color: var(--text-faint); flex-shrink: 0; }
+  .browser-chrome span { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-faint); }
+  .fake-lines { display: flex; flex-direction: column; gap: 10px; opacity: 0.5; }
+  .fake-lines div { height: 9px; border-radius: 4px; background: var(--surface-2); }
+  .fake-lines div:nth-child(1) { width: 78%; }
+  .fake-lines div:nth-child(2) { width: 92%; }
+  .fake-lines div:nth-child(3) { width: 60%; }
+  .ext-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    background: var(--surface); border-radius: 22px 22px 0 0;
+    padding: 16px 20px 22px; border-top: 1px solid var(--border);
+  }
+  .ext-title { font-size: 0.8rem; color: var(--text-dim); text-align: center; margin-bottom: 14px; }
+  .ext-title b { color: var(--text); }
+  .quickpick-row { display: flex; gap: 16px; justify-content: center; margin-bottom: 16px; }
+  .quickpick { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .quickpick-avatar {
+    width: 46px; height: 46px; border-radius: 50%; background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);
+  }
+  .quickpick-avatar.picked { border: 2px solid var(--accent); }
+  .quickpick-avatar svg { width: 20px; height: 20px; }
+  .quickpick span { font-size: 0.66rem; color: var(--text-dim); }
+  .ext-more { text-align: center; font-size: 0.78rem; color: var(--accent); font-weight: 600; }
+
+  /* QR connect */
+  .qr-big {
+    width: 168px; height: 168px; margin: 0 auto 20px; border-radius: var(--radius-md);
+    background:
+      repeating-conic-gradient(var(--text) 0% 25%, transparent 0% 50%) 0 0/14px 14px;
+    padding: 14px;
+  }
+  .qr-big-inner { width: 100%; height: 100%; background: var(--bg); border-radius: 10px; }
+  .qr-code-text { font-family: var(--font-mono); font-size: 1.1rem; letter-spacing: 0.08em; text-align:center; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .qr-help { color: var(--text-dim); font-size: 0.78rem; text-align: center; max-width: 26ch; margin: 0 auto; }
+  .back-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .back-row svg { width: 18px; height: 18px; color: var(--text); }
+  .back-row span { font-weight: 650; font-family: var(--font-display); font-size: 1.05rem; }
+
+  /* list rows: settings & files */
+  .list-section-label {
+    font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-faint); margin: 16px 0 8px;
+  }
+  .list-section-label:first-child { margin-top: 0; }
+  .list-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 12px;
+  }
+  .list-row:first-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .list-row:last-child { border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-bottom: none; }
+  .list-row .li-icon { width: 26px; height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--text-dim); }
+  .list-row .li-icon svg { width: 17px; height: 17px; }
+  .list-row .li-label { flex: 1; font-size: 0.86rem; }
+  .list-row .li-value { font-size: 0.8rem; color: var(--text-faint); }
+  .list-row .li-chevron { width: 14px; height: 14px; color: var(--text-faint); }
+  .toggle { width: 36px; height: 21px; border-radius: 999px; background: var(--surface-2); position: relative; flex-shrink: 0; }
+  .toggle.on { background: var(--ready); }
+  .toggle::after { content:""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: var(--text); }
+  .toggle.on::after { left: auto; right: 2px; background: #fff; }
+  .file-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; }
+  .file-icon { width: 34px; height: 34px; border-radius: 9px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .file-icon svg { width: 16px; height: 16px; }
+  .file-meta { flex: 1; min-width: 0; }
+  .file-name { font-size: 0.84rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-sub { font-size: 0.72rem; color: var(--text-faint); font-family: var(--font-mono); }
+  .source-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .source-chip { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 0.74rem; }
+  .source-chip svg { width: 13px; height: 13px; }
+  .source-chip.active { border-color: var(--accent); color: var(--accent); }
+
   footer.note {
     margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--border);
     color: var(--text-faint); font-size: 0.82rem;
@@ -399,6 +477,14 @@
   <symbol id="i-next" viewBox="0 0 24 24" fill="currentColor"><path d="M18 5h-2v14h2zM5 5l11 7-11 7z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.3-4.3" stroke-linecap="round"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 5 7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 5-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" stroke-linejoin="round"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8.5a15 15 0 0 1 18 0M6.2 12.2a10.5 10.5 0 0 1 11.6 0M9.6 15.8a6 6 0 0 1 4.8 0" stroke-linecap="round"/><circle cx="12" cy="19" r="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 18h10.5a3.5 3.5 0 0 0 0-7 5.5 5.5 0 0 0-10.6-1.7A4 4 0 0 0 7 18Z" stroke-linejoin="round"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="3.4"/><path d="M4.5 20c1.4-3.6 4.3-5.4 7.5-5.4s6.1 1.8 7.5 5.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v6c0 5-3 7.5-7 9-4-1.5-7-4-7-9V6z" stroke-linejoin="round"/></symbol>
 </svg>
 
 <div class="wrap">
@@ -476,7 +562,7 @@ flowchart TD
 
   <section id="screens">
     <h2>Skärmgalleri</h2>
-    <p class="section-note">Sju nyckelskärmar i flödesordning, från startsida till tomt läge. Skrolla i sidled.</p>
+    <p class="section-note">Tio nyckelskärmar i flödesordning — från startsida, via dela-arket och QR-fallbacken, till inställningar. Skrolla i sidled.</p>
 
     <div class="gallery-scroll">
 
@@ -640,6 +726,92 @@ flowchart TD
           </div>
         </div></div>
         <div class="frame-label"><b>6. Tomt läge</b> — konkret hjälp, aldrig en död återvändsgränd</div>
+      </div>
+
+      <!-- 7. Dela-arket (share extension) -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="screen-body" style="padding-top:14px;">
+            <div class="browser-chrome"><svg><use href="#i-search"/></svg><span>fredcast.app/album/sommaren</span></div>
+            <div class="fake-lines"><div></div><div></div><div></div></div>
+          </div>
+          <div class="ext-sheet">
+            <div class="sheet-handle"></div>
+            <p class="ext-title">Dela <b>1 bild</b> med</p>
+            <div class="quickpick-row">
+              <div class="quickpick"><div class="quickpick-avatar picked"><svg width="18" height="18"><use href="#i-tv"/></svg></div><span>Vardagsrum</span></div>
+              <div class="quickpick"><div class="quickpick-avatar"><svg width="18" height="18"><use href="#i-tv"/></svg></div><span>Sovrum</span></div>
+              <div class="quickpick"><div class="quickpick-avatar"><svg width="18" height="18"><use href="#i-speaker"/></svg></div><span>Sonos Arc</span></div>
+            </div>
+            <div class="sheet-btn">Skicka till Vardagsrum</div>
+            <div class="ext-more">Fler skärmar…</div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>7. Dela-ark</b> — dyker upp direkt i systemets delningsmeny, appen öppnas aldrig</div>
+      </div>
+
+      <!-- 8. QR-anslutning -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:09</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <div class="back-row"><svg><use href="#i-back"/></svg><span>Anslut med kod</span></div>
+            <div class="qr-big"><div class="qr-big-inner"></div></div>
+            <p class="qr-code-text">482 &nbsp;019</p>
+            <p class="qr-help">Öppna <b style="color:var(--text)">fredcast.app/connect</b> i webbläsaren på din skärm, eller skanna koden — funkar även om ni är på olika nätverk</p>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>8. QR-anslutning</b> — universell fallback när mDNS/DLNA inte hittar skärmen</div>
+      </div>
+
+      <!-- 9. Filhanterare -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:10</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="greet-title" style="font-size:1.25rem;margin-bottom:14px;">Filer</p>
+            <div class="source-row">
+              <div class="source-chip active"><svg><use href="#i-laptop"/></svg>På enheten</div>
+              <div class="source-chip"><svg><use href="#i-cloud"/></svg>iCloud</div>
+              <div class="source-chip"><svg><use href="#i-cloud"/></svg>Drive</div>
+            </div>
+            <div class="file-row"><div class="file-icon"><svg><use href="#i-doc"/></svg></div><div class="file-meta"><div class="file-name">Kvitton_2026.pdf</div><div class="file-sub">2,1 MB</div></div></div>
+            <div class="file-row"><div class="file-icon"><svg><use href="#i-doc"/></svg></div><div class="file-meta"><div class="file-name">Bjudning – Midsommar.docx</div><div class="file-sub">312 KB</div></div></div>
+            <div class="file-row"><div class="file-icon"><svg><use href="#i-doc"/></svg></div><div class="file-meta"><div class="file-name">Reseplan Grekland.pdf</div><div class="file-sub">1,4 MB</div></div></div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item"><svg><use href="#i-home"/></svg><span>Idag</span></div>
+            <div class="nav-item active"><svg><use href="#i-grid"/></svg><span>Bibliotek</span></div>
+            <div class="nav-item"><svg><use href="#i-tv"/></svg><span>Skärmar</span></div>
+            <div class="nav-item"><svg><use href="#i-gear"/></svg><span>Inst.</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>9. Filhanterare</b> — molnkällor som alternativ, ingen egen molnlagring krävs</div>
+      </div>
+
+      <!-- 10. Inställningar -->
+      <div class="frame-block">
+        <div class="phone"><div class="screen">
+          <div class="statusbar"><span>21:11</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <div class="screen-body">
+            <p class="greet-title" style="font-size:1.25rem;margin-bottom:10px;">Inställningar</p>
+            <p class="list-section-label">Konto</p>
+            <div class="list-row"><div class="li-icon"><svg><use href="#i-user"/></svg></div><div class="li-label">Fredrik K.</div><svg class="li-chevron"><use href="#i-chevron"/></svg></div>
+            <p class="list-section-label">Nätverk &amp; kvalitet</p>
+            <div class="list-row"><div class="li-icon"><svg><use href="#i-wifi"/></svg></div><div class="li-label">Wi-Fi</div><span class="li-value">Hemma</span></div>
+            <div class="list-row"><div class="li-icon"><svg><use href="#i-tv"/></svg></div><div class="li-label">Auto-kvalitet</div><div class="toggle on"></div></div>
+            <p class="list-section-label">Notiser &amp; integritet</p>
+            <div class="list-row"><div class="li-icon"><svg><use href="#i-bell"/></svg></div><div class="li-label">Anslutningsnotiser</div><div class="toggle on"></div></div>
+            <div class="list-row"><div class="li-icon"><svg><use href="#i-shield"/></svg></div><div class="li-label">Tillåt molnrelä (fallback)</div><div class="toggle"></div></div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item"><svg><use href="#i-home"/></svg><span>Idag</span></div>
+            <div class="nav-item"><svg><use href="#i-grid"/></svg><span>Bibliotek</span></div>
+            <div class="nav-item"><svg><use href="#i-tv"/></svg><span>Skärmar</span></div>
+            <div class="nav-item active"><svg><use href="#i-gear"/></svg><span>Inst.</span></div>
+          </div>
+        </div></div>
+        <div class="frame-label"><b>10. Inställningar</b> — molnrelä är avstängd som standard, LAN-first</div>
       </div>
 
     </div>
