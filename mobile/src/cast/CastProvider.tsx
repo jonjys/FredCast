@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CastEngine } from './CastEngine';
 import { MockAdapter } from './adapters/MockAdapter';
+import { PwaReceiverAdapter } from './adapters/PwaReceiverAdapter';
+import { RELAY_WS_URL } from './config';
 import { CastDevice, MediaItem, PlaybackState } from './types';
 
 export interface DeviceGroup {
@@ -25,6 +27,8 @@ interface CastContextValue {
   disconnect: () => Promise<void>;
   toggleFavorite: (deviceId: string) => void;
   cast: (item: MediaItem, deviceId?: string) => Promise<void>;
+  pairWithCode: (code: string) => Promise<void>;
+  pairing: boolean;
   sending: boolean;
   playback: PlaybackState | null;
   controlPlayback: (command: 'play' | 'pause' | 'next' | 'previous') => void;
@@ -35,15 +39,17 @@ interface CastContextValue {
 const CastContext = createContext<CastContextValue | null>(null);
 
 // Single engine instance for the app's lifetime. Registering a real
-// GoogleCastAdapter/DlnaAdapter alongside MockAdapter later requires no
-// changes below — see MVP_BACKLOG.md Epic 1.
-const engine = new CastEngine([new MockAdapter()]);
+// GoogleCastAdapter/DlnaAdapter later requires no changes below — see
+// MVP_BACKLOG.md Epic 1.
+const pwaReceiverAdapter = new PwaReceiverAdapter(RELAY_WS_URL);
+const engine = new CastEngine([new MockAdapter(), pwaReceiverAdapter]);
 
 export function CastProvider({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [connectedDeviceId, setConnectedDeviceId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [pairing, setPairing] = useState(false);
   const [sending, setSending] = useState(false);
   const [playback, setPlayback] = useState<PlaybackState | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -133,6 +139,20 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
     if (tickRef.current) clearInterval(tickRef.current);
   }, [connectedDeviceId]);
 
+  const pairWithCode = useCallback(async (code: string) => {
+    setLastError(null);
+    setPairing(true);
+    try {
+      const device = await pwaReceiverAdapter.pairWithCode(code);
+      setConnectedDeviceId(device.id);
+    } catch (e) {
+      setLastError(e instanceof Error ? e.message : 'Kunde inte ansluta med koden.');
+      throw e;
+    } finally {
+      setPairing(false);
+    }
+  }, []);
+
   const toggleFavorite = useCallback((deviceId: string) => {
     setFavoriteIds((prev) => {
       const next = new Set(prev);
@@ -204,6 +224,8 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
     disconnect,
     toggleFavorite,
     cast,
+    pairWithCode,
+    pairing,
     sending,
     playback,
     controlPlayback,

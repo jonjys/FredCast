@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { useCast } from '../cast/CastProvider';
 import { DeviceCard } from '../components/DeviceCard';
@@ -51,6 +51,13 @@ export function DevicesScreen({ onOpenQr }: { onOpenQr: () => void }) {
           ))}
         </View>
       ))}
+
+      {/* Ser din skärm inte i listan ovan? QR/kod-anslutning ska alltid finnas
+          till hands, inte bara i tomt-läget — se PRODUCT_PLAN.md §9. */}
+      <Pressable onPress={onOpenQr} style={[styles.qrRow, { borderColor: t.colors.border }]}>
+        <Icon name="search" size={14} color={t.colors.textDim} />
+        <Text style={{ color: t.colors.textDim, fontSize: 13 }}>Hittar du inte din skärm? Anslut med kod</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -58,4 +65,15 @@ export function DevicesScreen({ onOpenQr }: { onOpenQr: () => void }) {
 const styles = StyleSheet.create({
   body: { padding: 18, paddingTop: 8 },
   groupLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 6 },
+  qrRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    borderStyle: 'dashed',
+    padding: 12,
+    marginTop: 8,
+  },
 });
