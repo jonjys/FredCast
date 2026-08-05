@@ -114,3 +114,47 @@ länk/refresh.
 Detta deployar bara **appens web-läge** (react-native-web) — inte relayn
 eller receiver-sidan, som behöver köras separat (se ovan) eller som egna
 Vercel-projekt om de ska nås publikt.
+
+## Gör QR/kod-casting publikt (gratis, ingen dator/Xcode krävs)
+
+Lokalt (`localhost`) funkar bara på samma maskin/nätverk. För att kunna
+skanna QR-koden med iPhonens kamera och casta till en riktig TV var som
+helst — helt gratis, direkt i Safari, inget App Store-konto eller Mac
+behövs — deploya relayn och receiver-sidan var för sig:
+
+**1. Relayn → Render.com (gratis webbtjänst)**
+
+`render.yaml` i repo-roten är ett färdigt "Blueprint": logga in på
+[render.com](https://render.com) med ditt GitHub-konto, välj **New +
+Blueprint**, peka på det här repot — Render läser `render.yaml` automatiskt
+och deployar `relay/` som en gratis webbtjänst. Du får en URL i stil med
+`https://fredcast-relay.onrender.com`. Byt `ws://` mot `wss://` i den:
+`wss://fredcast-relay.onrender.com/ws`.
+
+*(Gratis-tiern på Render somnar efter inaktivitet och tar ~30–50 sekunder
+att vakna vid första anslutningen — helt okej för ett hobbyprojekt, märks
+bara som en kort fördröjning första gången TV-sidan öppnas efter ett tag.)*
+
+**2. Receiver-sidan → egen Vercel-app (statisk)**
+
+Skapa ett nytt Vercel-projekt som pekar på `receiver/` som root directory
+(inga build-inställningar behövs, det är bara statisk HTML). Du får en URL,
+t.ex. `https://fredcast-receiver.vercel.app`. Öppna den på TV:ns/datorns
+webbläsare med relay-adressen i frågesträngen:
+
+```
+https://fredcast-receiver.vercel.app/?relay=wss://fredcast-relay.onrender.com/ws&appUrl=https://fred-cast.vercel.app
+```
+
+**3. Appen → peka mot samma relay**
+
+I Vercel-projektet för `mobile/` (appen), lägg till en miljövariabel:
+
+```
+EXPO_PUBLIC_RELAY_WS_URL=wss://fredcast-relay.onrender.com/ws
+```
+
+och deploya om. Nu funkar hela kedjan publikt: öppna receiver-URL:en på en
+TV/dator, skanna QR-koden med iPhonens Kamera-app, Safari öppnas på
+FredCast-appen redan ansluten — inget att skriva in, inget konto, inget
+Xcode.
