@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../theme/ThemeProvider';
 import { useCast } from '../cast/CastProvider';
 import { DeviceCard } from './DeviceCard';
 import { PrimaryButton } from './PrimaryButton';
-import { MockPhoto } from '../data/mockMedia';
+import { Icon } from '../icons/Icon';
+import { MediaItem } from '../cast/types';
+
+type CastableItem = MediaItem & { gradient?: [string, string] };
 
 type Props = {
-  item: MockPhoto | null;
+  item: CastableItem | null;
   onClose: () => void;
 };
 
@@ -57,10 +60,14 @@ export function CastSheet({ item, onClose }: Props) {
           </>
         ) : (
           <>
-            {'gradient' in item ? (
+            {item.gradient ? (
               <LinearGradient colors={item.gradient} style={styles.thumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+            ) : item.kind === 'image' && item.uri ? (
+              <Image source={{ uri: item.uri }} style={styles.thumb} resizeMode="cover" />
             ) : (
-              <View style={[styles.thumb, { backgroundColor: t.colors.surface2 }]} />
+              <View style={[styles.thumb, styles.thumbIconWrap, { backgroundColor: t.colors.surface2 }]}>
+                <Icon name={item.kind === 'video' ? 'play' : 'doc'} size={28} color={t.colors.textFaint} />
+              </View>
             )}
             <Text style={[styles.fileLabel, { color: t.colors.textDim }]}>
               {item.name}
@@ -101,6 +108,7 @@ const styles = StyleSheet.create({
   },
   handle: { width: 34, height: 4, borderRadius: 3, opacity: 0.5, alignSelf: 'center', marginBottom: 16 },
   thumb: { width: '100%', height: 140, borderRadius: 14, marginBottom: 14 },
+  thumbIconWrap: { alignItems: 'center', justifyContent: 'center' },
   fileLabel: { fontSize: 13, marginBottom: 14, textAlign: 'center' },
   groupLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
 });

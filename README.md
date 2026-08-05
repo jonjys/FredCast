@@ -48,6 +48,15 @@ Expo (React Native + TypeScript) — samma kodbas för iOS och Android
 - **Skärmar**: hemskärm, enhetslista (rumsgrupperad, favoriter pinnade),
   galleri (mock-bilder/video/filer), cast-bottensheet, Now Playing,
   Inställningar, QR-fallback.
+- **Riktiga filer, inte bara exempeldata** (`src/media/pickers.ts`):
+  "Välj bild/video/fil från telefonen" i Bibliotek använder
+  `expo-image-picker`/`expo-document-picker` och skickar den faktiska filen
+  (som en data-URI) via `PwaReceiverAdapter` — verifierat pixel för pixel
+  mot en riktig mottagarsida, inte bara att UI:t inte kraschar. Filer över
+  8 MB avvisas med ett tydligt felmeddelande i UI:t (data-URI-över-WebSocket
+  har en praktisk storleksgräns i den här milstolpen; stora videor till en
+  riktig Cast/DLNA-enhet kräver den lokala HTTP-servern i PRODUCT_PLAN.md §8,
+  vilket är en native-modul-milstolpe, inte något pickers-lagret kan lösa).
 
 ### Köra appen
 
@@ -91,3 +100,17 @@ Relayn bär bara korta JSON-kommandon (kod-parkoppling, media-URL,
 play/pause) — den lagrar inga konton eller historik och stänger rum
 automatiskt när båda sidor kopplat ner (se kommentarerna i
 `relay/server.js` och avvägningen i PRODUCT_PLAN.md §9).
+
+## Deploy (Vercel)
+
+Repot har `mobile/`, `relay/`, `receiver/` och `docs/` som syskonmappar utan
+någon egen build-konfiguration i repo-roten — Vercels zero-config-detektion
+hittar då inget att bygga där och ger 404. `package.json` och `vercel.json`
+i repo-roten löser det: build-kommandot kör `expo export --platform web`
+inne i `mobile/` och pekar Vercel på `mobile/dist` som output-mapp, med en
+SPA-rewrite så att appens klientsidiga rutter inte 404:ar vid en direkt
+länk/refresh.
+
+Detta deployar bara **appens web-läge** (react-native-web) — inte relayn
+eller receiver-sidan, som behöver köras separat (se ovan) eller som egna
+Vercel-projekt om de ska nås publikt.
