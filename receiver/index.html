@@ -27,15 +27,19 @@
   }
   #placeholder {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 24px; text-align: center; padding: 40px;
+    gap: 20px; text-align: center; padding: 40px;
   }
   #logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
+  #qrWrap {
+    background: #fff; padding: 16px; border-radius: 18px; line-height: 0;
+  }
+  #qrWrap svg { width: 200px; height: 200px; display: block; }
   #code {
     font-family: ui-monospace, "SF Mono", monospace;
-    font-size: 3rem; letter-spacing: 0.15em; font-weight: 700;
-    background: rgba(255,255,255,0.06); padding: 16px 32px; border-radius: 18px;
+    font-size: 1.6rem; letter-spacing: 0.15em; font-weight: 700;
+    color: var(--text-dim);
   }
-  #hint { color: var(--text-dim); font-size: 1.05rem; max-width: 32ch; }
+  #hint { color: var(--text-dim); font-size: 1.05rem; max-width: 34ch; }
   #status {
     position: fixed; top: 20px; right: 24px; display: flex; align-items: center; gap: 8px;
     font-size: 0.85rem; color: var(--text-dim);
@@ -53,18 +57,26 @@
   <div id="stage">
     <div id="placeholder">
       <div id="logo">FredCast Receiver</div>
+      <div id="qrWrap"></div>
       <div id="code">------</div>
-      <div id="hint">Öppna FredCast på din telefon → Anslut med kod → ange koden ovan</div>
+      <div id="hint">Skanna QR-koden med kameran på din telefon — eller öppna FredCast och skriv in koden ovan</div>
     </div>
   </div>
   <div id="filename"></div>
 
+  <!-- Vendored qrcode-generator (MIT, Kazuhiko Arase) — no CDN, works offline on a TV browser -->
+  <script src="./vendor/qrcode.js"></script>
   <script>
     // Points at the local relay by default; override with ?relay=wss://host:port
     const params = new URLSearchParams(location.search);
     const relayUrl = params.get('relay') || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.hostname + ':8787/ws';
+    // Where the FredCast app itself is hosted, so the QR code can deep-link
+    // straight into it with the pairing code pre-filled — override with
+    // ?appUrl=https://your-app-host for local testing against a non-default app.
+    const appUrl = params.get('appUrl') || 'https://fred-cast.vercel.app';
 
     const codeEl = document.getElementById('code');
+    const qrWrapEl = document.getElementById('qrWrap');
     const stageEl = document.getElementById('stage');
     const placeholderEl = document.getElementById('placeholder');
     const statusDot = document.getElementById('statusDot');
@@ -73,6 +85,13 @@
 
     let ws;
     let code = params.get('code');
+
+    function renderQr(pairUrl) {
+      const qr = qrcode(0, 'M'); // type 0 = auto-detect smallest size for the data
+      qr.addData(pairUrl);
+      qr.make();
+      qrWrapEl.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4 });
+    }
 
     async function ensureCode() {
       if (code) return code;
@@ -112,6 +131,8 @@
 
         if (msg.type === 'joined') {
           codeEl.textContent = msg.code.slice(0, 3) + ' ' + msg.code.slice(3);
+          const pairUrl = `${appUrl}/?connectCode=${msg.code}`;
+          renderQr(pairUrl);
         }
 
         if (msg.type === 'peer-status') {
@@ -143,6 +164,7 @@
     ensureCode().then((c) => {
       code = c;
       codeEl.textContent = c.slice(0, 3) + ' ' + c.slice(3);
+      renderQr(`${appUrl}/?connectCode=${c}`);
       connect();
     });
   </script>

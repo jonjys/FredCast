@@ -7,7 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "FredCast behöver tillgång till dina bilder och videor för att kunna visa dem på en skärm.",
+        "NSLocalNetworkUsageDescription": "FredCast söker efter Chromecast, DLNA och andra skärmar på ditt Wi-Fi-nätverk."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +20,19 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FredCast behöver tillgång till dina bilder och videor för att kunna visa dem på en skärm."
+        }
+      ]
+    ]
   }
 }

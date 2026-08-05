@@ -1,19 +1,26 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MockPhoto } from '../data/mockMedia';
+import { MediaItem } from '../cast/types';
 
-type Props = {
-  photos: MockPhoto[];
-  onPress: (photo: MockPhoto) => void;
+export type GridItem = MediaItem & { gradient?: [string, string] };
+
+type Props<T extends GridItem> = {
+  photos: T[];
+  onPress: (photo: T) => void;
 };
 
-export function PhotoGrid({ photos, onPress }: Props) {
+/** Renders a real thumbnail for picked media (has `uri`, no `gradient`), or the mock gradient tile for sample content. */
+export function PhotoGrid<T extends GridItem>({ photos, onPress }: Props<T>) {
   return (
     <View style={styles.grid}>
       {photos.map((photo) => (
         <Pressable key={photo.id} style={styles.cell} onPress={() => onPress(photo)}>
-          <LinearGradient colors={photo.gradient} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          {photo.gradient ? (
+            <LinearGradient colors={photo.gradient} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          ) : (
+            <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          )}
         </Pressable>
       ))}
     </View>

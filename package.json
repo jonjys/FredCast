@@ -1,0 +1,7 @@
+{
+  "name": "fredcast",
+  "private": true,
+  "scripts": {
+    "build": "cd mobile && npm install && npx expo export --platform web --output-dir dist"
+  }
+}

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme/ThemeProvider';
@@ -9,6 +11,8 @@ import { DevicesScreen } from '../screens/DevicesScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { NowPlayingScreen } from '../screens/NowPlayingScreen';
 import { QrConnectScreen } from '../screens/QrConnectScreen';
+import { useAutoConnectFromUrl } from '../cast/useAutoConnectFromUrl';
+import { AutoConnectBanner } from '../components/AutoConnectBanner';
 
 const Tab = createBottomTabNavigator();
 
@@ -23,6 +27,8 @@ export function RootNavigator() {
   const t = useTheme();
   const [nowPlayingOpen, setNowPlayingOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const autoConnectStatus = useAutoConnectFromUrl();
+  const insets = useSafeAreaInsets();
 
   const navTheme = {
     ...(t.scheme === 'dark' ? DarkTheme : DefaultTheme),
@@ -60,8 +66,23 @@ export function RootNavigator() {
         </Tab.Navigator>
       </NavigationContainer>
 
+      {autoConnectStatus !== 'idle' ? (
+        <View style={[styles.autoConnectOverlay, { top: insets.top }]} pointerEvents="box-none">
+          <AutoConnectBanner status={autoConnectStatus} />
+        </View>
+      ) : null}
+
       <NowPlayingScreen visible={nowPlayingOpen} onClose={() => setNowPlayingOpen(false)} />
       <QrConnectScreen visible={qrOpen} onClose={() => setQrOpen(false)} />
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  autoConnectOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+});
