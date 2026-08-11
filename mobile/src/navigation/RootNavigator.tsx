@@ -13,6 +13,8 @@ import { NowPlayingScreen } from '../screens/NowPlayingScreen';
 import { QrConnectScreen } from '../screens/QrConnectScreen';
 import { useAutoConnectFromUrl } from '../cast/useAutoConnectFromUrl';
 import { AutoConnectBanner } from '../components/AutoConnectBanner';
+import { CastHeaderButton } from '../components/CastHeaderButton';
+import { ConnectToSheet } from '../components/ConnectToSheet';
 
 const Tab = createBottomTabNavigator();
 
@@ -27,6 +29,7 @@ export function RootNavigator() {
   const t = useTheme();
   const [nowPlayingOpen, setNowPlayingOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [connectToOpen, setConnectToOpen] = useState(false);
   const autoConnectStatus = useAutoConnectFromUrl();
   const insets = useSafeAreaInsets();
 
@@ -66,14 +69,23 @@ export function RootNavigator() {
         </Tab.Navigator>
       </NavigationContainer>
 
+      <View style={[styles.headerOverlay, { top: insets.top + 10 }]} pointerEvents="box-none">
+        <CastHeaderButton onPress={() => setConnectToOpen(true)} />
+      </View>
+
       {autoConnectStatus !== 'idle' ? (
-        <View style={[styles.autoConnectOverlay, { top: insets.top }]} pointerEvents="box-none">
+        <View style={[styles.autoConnectOverlay, { top: insets.top + 54 }]} pointerEvents="box-none">
           <AutoConnectBanner status={autoConnectStatus} />
         </View>
       ) : null}
 
       <NowPlayingScreen visible={nowPlayingOpen} onClose={() => setNowPlayingOpen(false)} />
       <QrConnectScreen visible={qrOpen} onClose={() => setQrOpen(false)} />
+      <ConnectToSheet
+        visible={connectToOpen}
+        onClose={() => setConnectToOpen(false)}
+        onAddScreen={() => setQrOpen(true)}
+      />
     </>
   );
 }
@@ -84,5 +96,12 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 34,
   },
 });
