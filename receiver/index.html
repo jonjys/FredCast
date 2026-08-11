@@ -50,6 +50,19 @@
     position: fixed; bottom: 24px; left: 0; right: 0; text-align: center;
     color: var(--text-dim); font-size: 0.9rem;
   }
+  #liveBadge {
+    position: fixed; top: 20px; left: 24px; display: none; align-items: center; gap: 6px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; color: #fff;
+    background: #e0393e; padding: 5px 10px 5px 8px; border-radius: 999px;
+  }
+  #liveBadge .liveDot { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+  #liveBadge.on { display: flex; }
+  #unmuteBtn {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: none; align-items: center; gap: 8px; background: rgba(0,0,0,0.65);
+    color: #fff; border: none; border-radius: 999px; padding: 10px 18px; font-size: 0.85rem;
+  }
+  #unmuteBtn.show { display: flex; }
 </style>
 </head>
 <body>
@@ -63,6 +76,8 @@
     </div>
   </div>
   <div id="filename"></div>
+  <div id="liveBadge"><span class="liveDot"></span>LIVE</div>
+  <button id="unmuteBtn">🔇 Tryck för ljud</button>
 
   <!-- Vendored qrcode-generator (MIT, Kazuhiko Arase) — no CDN, works offline on a TV browser -->
   <script src="./vendor/qrcode.js"></script>
@@ -82,9 +97,77 @@
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const filenameEl = document.getElementById('filename');
+    const liveBadgeEl = document.getElementById('liveBadge');
+    const unmuteBtnEl = document.getElementById('unmuteBtn');
 
     let ws;
     let code = params.get('code');
+    let pc = null; // RTCPeerConnection for the live camera stream
+
+    // Public STUN server (free, Google-operated) — only used to discover
+    // the phone's/TV's NAT-mapped address so the two can find a direct
+    // path; no video ever touches it. Enough for same-Wi-Fi "hemma" use;
+    // streaming across networks ("ute") would additionally need a TURN
+    // relay, which is a paid/less-reliable-free-tier service, so that's
+    // out of scope for this first version.
+    const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    function stopLiveStream() {
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      liveBadgeEl.classList.remove('on');
+      unmuteBtnEl.classList.remove('show');
+      stageEl.querySelectorAll('video').forEach((el) => el.remove());
+      placeholderEl.style.display = 'flex';
+    }
+
+    async function handleOffer(sdp) {
+      stageEl.querySelectorAll('img, video').forEach((el) => el.remove());
+      placeholderEl.style.display = 'none';
+      filenameEl.textContent = '';
+
+      pc = new RTCPeerConnection(RTC_CONFIG);
+      let liveVideoEl = null;
+
+      // ontrack fires once per track (video AND audio arrive as separate
+      // events, both pointing at the same event.streams[0]) — reuse a
+      // single <video> element instead of creating a new one per track.
+      pc.ontrack = (event) => {
+        if (!liveVideoEl) {
+          liveVideoEl = document.createElement('video');
+          liveVideoEl.autoplay = true;
+          liveVideoEl.playsInline = true;
+          liveVideoEl.muted = true; // autoplay requires muted on most TV/browser policies
+          stageEl.appendChild(liveVideoEl);
+          liveBadgeEl.classList.add('on');
+          unmuteBtnEl.classList.add('show');
+          unmuteBtnEl.onclick = () => {
+            liveVideoEl.muted = false;
+            unmuteBtnEl.classList.remove('show');
+          };
+        }
+        liveVideoEl.srcObject = event.streams[0];
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({ type: 'webrtc-ice', candidate: event.candidate }));
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc && (pc.connectionState === 'closed' || pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) {
+          stopLiveStream();
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      ws.send(JSON.stringify({ type: 'webrtc-answer', sdp: pc.localDescription }));
+    }
 
     function renderQr(pairUrl) {
       const qr = qrcode(0, 'M'); // type 0 = auto-detect smallest size for the data
@@ -149,12 +232,22 @@
           if (!video) return;
           if (msg.command === 'play') video.play();
           if (msg.command === 'pause') video.pause();
+          if (msg.command === 'stop-live') stopLiveStream();
+        }
+
+        if (msg.type === 'webrtc-offer') {
+          handleOffer(msg.sdp);
+        }
+
+        if (msg.type === 'webrtc-ice' && pc) {
+          pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
         }
       };
 
       ws.onclose = () => {
         statusDot.classList.remove('on');
         statusText.textContent = 'Frånkopplad — återansluter…';
+        stopLiveStream();
         setTimeout(connect, 1500);
       };
 

@@ -111,11 +111,14 @@ wss.on('connection', (ws) => {
     if (!room) return;
     const peer = peerOf(room, joinedRole);
 
-    // Everything else (media / control / status) is opaque relay traffic —
-    // the server doesn't interpret it, just forwards to whichever peer is
-    // in the room. Keeps the receiver and sender free to evolve their
-    // message shapes independently of this server.
-    if (['media', 'control', 'status'].includes(msg.type)) {
+    // Everything else (media / control / status / webrtc-*) is opaque relay
+    // traffic — the server doesn't interpret it, just forwards to whichever
+    // peer is in the room. Keeps the receiver and sender free to evolve
+    // their message shapes independently of this server. The webrtc-*
+    // types carry SDP offer/answer and ICE candidates for the live-camera
+    // stream (PRODUCT_PLAN-adjacent "filma → visas direkt på TV:n" feature) —
+    // this server never sees the actual video, only the signalling.
+    if (['media', 'control', 'status', 'webrtc-offer', 'webrtc-answer', 'webrtc-ice'].includes(msg.type)) {
       send(peer, msg);
     }
   });
