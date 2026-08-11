@@ -22,7 +22,8 @@ export type IconName =
   | 'wifi'
   | 'cloud'
   | 'user'
-  | 'shield';
+  | 'shield'
+  | 'cast';
 
 type Props = {
   name: IconName;
@@ -187,6 +188,19 @@ export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.6 }: Pro
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M12 3l7 3v6c0 5-3 7.5-7 9-4-1.5-7-4-7-9V6z" strokeLinejoin="round" {...stroke} />
+        </Svg>
+      );
+    case 'cast':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path {...stroke} strokeWidth={1.7} d="M2.5 6h16.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4.5" strokeLinecap="round" />
+          <Path
+            {...stroke}
+            strokeWidth={1.7}
+            d="M2.5 14.5a5.5 5.5 0 0 1 5.5 5.5M2.5 17.8a2.2 2.2 0 0 1 2.2 2.2"
+            strokeLinecap="round"
+          />
+          <Circle cx={2.9} cy={20} r={1.1} fill={color} stroke="none" />
         </Svg>
       );
     default:
