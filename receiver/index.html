@@ -67,9 +67,9 @@
   <!-- Vendored qrcode-generator (MIT, Kazuhiko Arase) — no CDN, works offline on a TV browser -->
   <script src="./vendor/qrcode.js"></script>
   <script>
-    // Points at the local relay by default; override with ?relay=wss://host:port
+    // Points at the hosted relay by default; override with ?relay=ws://localhost:8787/ws for local dev
     const params = new URLSearchParams(location.search);
-    const relayUrl = params.get('relay') || (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.hostname + ':8787/ws';
+    const relayUrl = params.get('relay') || 'wss://fredcast-relay.onrender.com/ws';
     // Where the FredCast app itself is hosted, so the QR code can deep-link
     // straight into it with the pairing code pre-filled — override with
     // ?appUrl=https://your-app-host for local testing against a non-default app.
