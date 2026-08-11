@@ -21,6 +21,8 @@ export class PwaReceiverAdapter implements CastAdapter {
   private onChange: ((devices: CastDevice[]) => void) | null = null;
   private devices = new Map<string, CastDevice>();
   private sockets = new Map<string, WebSocket>();
+  /** Raw socket message listeners, keyed by device — used for WebRTC signalling (see startLiveStream). */
+  private messageListeners = new Map<string, Set<(msg: Record<string, unknown>) => void>>();
 
   constructor(relayUrl: string) {
     this.relayUrl = relayUrl;
@@ -86,6 +88,10 @@ export class PwaReceiverAdapter implements CastAdapter {
             this.emit();
           }
         }
+
+        // WebRTC signalling replies (webrtc-answer/webrtc-ice) from the
+        // receiver flow through here too — see startLiveStream/onMessage.
+        this.messageListeners.get(deviceId)?.forEach((listener) => listener(msg));
       };
 
       socket.onerror = () => {
@@ -136,6 +142,20 @@ export class PwaReceiverAdapter implements CastAdapter {
     socket?.close();
     this.sockets.delete(deviceId);
     this.devices.delete(deviceId);
+    this.messageListeners.delete(deviceId);
     this.emit();
+  }
+
+  /** Sends an arbitrary relay message (used for webrtc-offer/webrtc-ice signalling by useLiveStream). */
+  sendRaw(deviceId: string, msg: Record<string, unknown>): void {
+    this.socketFor(deviceId).send(JSON.stringify(msg));
+  }
+
+  /** Subscribes to raw relay messages for a device (webrtc-answer/webrtc-ice replies). Returns an unsubscribe fn. */
+  onMessage(deviceId: string, listener: (msg: Record<string, unknown>) => void): () => void {
+    const set = this.messageListeners.get(deviceId) ?? new Set();
+    set.add(listener);
+    this.messageListeners.set(deviceId, set);
+    return () => set.delete(listener);
   }
 }

@@ -40,8 +40,10 @@ const CastContext = createContext<CastContextValue | null>(null);
 
 // Single engine instance for the app's lifetime. Registering a real
 // GoogleCastAdapter/DlnaAdapter later requires no changes below — see
-// MVP_BACKLOG.md Epic 1.
-const pwaReceiverAdapter = new PwaReceiverAdapter(RELAY_WS_URL);
+// MVP_BACKLOG.md Epic 1. Exported so useLiveStream.ts can send WebRTC
+// signalling messages directly (that traffic doesn't fit the generic
+// CastAdapter interface other protocols would need to implement too).
+export const pwaReceiverAdapter = new PwaReceiverAdapter(RELAY_WS_URL);
 const engine = new CastEngine([new MockAdapter(), pwaReceiverAdapter]);
 
 export function CastProvider({ children }: { children: React.ReactNode }) {

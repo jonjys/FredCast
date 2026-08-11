@@ -11,6 +11,7 @@ import { DevicesScreen } from '../screens/DevicesScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { NowPlayingScreen } from '../screens/NowPlayingScreen';
 import { QrConnectScreen } from '../screens/QrConnectScreen';
+import { LiveScreen } from '../screens/LiveScreen';
 import { useAutoConnectFromUrl } from '../cast/useAutoConnectFromUrl';
 import { AutoConnectBanner } from '../components/AutoConnectBanner';
 import { CastHeaderButton } from '../components/CastHeaderButton';
@@ -30,6 +31,7 @@ export function RootNavigator() {
   const [nowPlayingOpen, setNowPlayingOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [connectToOpen, setConnectToOpen] = useState(false);
+  const [liveOpen, setLiveOpen] = useState(false);
   const autoConnectStatus = useAutoConnectFromUrl();
   const insets = useSafeAreaInsets();
 
@@ -59,7 +61,9 @@ export function RootNavigator() {
           })}
         >
           <Tab.Screen name="Idag">
-            {({ navigation }) => <TodayScreen onOpenLibrary={() => navigation.navigate('Bibliotek')} />}
+            {({ navigation }) => (
+              <TodayScreen onOpenLibrary={() => navigation.navigate('Bibliotek')} onOpenLive={() => setLiveOpen(true)} />
+            )}
           </Tab.Screen>
           <Tab.Screen name="Bibliotek">
             {() => <LibraryScreen onOpenNowPlaying={() => setNowPlayingOpen(true)} />}
@@ -81,6 +85,7 @@ export function RootNavigator() {
 
       <NowPlayingScreen visible={nowPlayingOpen} onClose={() => setNowPlayingOpen(false)} />
       <QrConnectScreen visible={qrOpen} onClose={() => setQrOpen(false)} />
+      <LiveScreen visible={liveOpen} onClose={() => setLiveOpen(false)} />
       <ConnectToSheet
         visible={connectToOpen}
         onClose={() => setConnectToOpen(false)}
