@@ -1,13 +1,27 @@
 /**
  * Fixtures for local development and tests only. lib/fred-client.ts (the
  * module the app actually ships) never imports this file — see the P0
- * Bugg 1 test in __tests__/fred-client.test.ts, which fails the build's
+ * Bugg 1 tests in __tests__/fredClient.test.ts, which fail the build's
  * test gate if any app/components/lib file ever does.
  */
-import type { FredObservation } from './fred-client';
+import type { BreakdownEntry, Summary, TimeSeriesPoint } from './fred-client';
 
-export const mockSeriesObservations: FredObservation[] = [
-  { date: '2026-01-01', value: 4.1 },
-  { date: '2026-02-01', value: 4.05 },
-  { date: '2026-03-01', value: 3.9 },
+export const devSummary: Summary = {
+  totalSaved: 3_200_000,
+  avgROI: 14.2,
+  decisionsCount: 128,
+  activeLoans: 42,
+  monthlyBurn: 210_000,
+};
+
+export const devTimeSeries: TimeSeriesPoint[] = [
+  { date: '2026-07-14', value: 2_600_000 },
+  { date: '2026-07-28', value: 2_950_000 },
+  { date: '2026-08-13', value: 3_200_000 },
+];
+
+export const devBreakdown: BreakdownEntry[] = [
+  { category: 'Refinansiering', value: 1_800_000 },
+  { category: 'Rantehedging', value: 900_000 },
+  { category: 'Ovrigt', value: 500_000 },
 ];

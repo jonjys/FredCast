@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { AuthzError, assertDashboardAccess } from '@/lib/authz';
+import { describe, expect, it, vi } from 'vitest';
+import { AuthzError, assertDashboardAccess, requireOrgAccess } from '@/lib/authz';
+
+vi.mock('next/navigation', () => ({
+  notFound: () => {
+    throw new Error('NEXT_NOT_FOUND');
+  },
+}));
 
 describe('P0 Bugg 3: dashboardRequiresAuthAndOrgMatch', () => {
   const dashboard = { id: 'demo', orgId: 'org_a' };
@@ -31,5 +37,19 @@ describe('P0 Bugg 3: dashboardRequiresAuthAndOrgMatch', () => {
   it('allows a user whose org matches the dashboard', () => {
     const user = { id: 'u1', orgId: 'org_a' };
     expect(() => assertDashboardAccess(user, dashboard)).not.toThrow();
+  });
+});
+
+describe('P0 Bugg 3: requireOrgAccess (route-level, 404 on mismatch)', () => {
+  it('404s an unauthenticated request instead of a differentiated status', () => {
+    expect(() => requireOrgAccess('org_123', undefined)).toThrow('NEXT_NOT_FOUND');
+  });
+
+  it('404s a signed-in user from a different org — org_456 cannot see org_123', () => {
+    expect(() => requireOrgAccess('org_123', 'org_456')).toThrow('NEXT_NOT_FOUND');
+  });
+
+  it('allows a user whose org matches the route', () => {
+    expect(() => requireOrgAccess('org_123', 'org_123')).not.toThrow();
   });
 });

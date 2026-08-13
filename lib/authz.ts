@@ -1,3 +1,5 @@
+import { notFound } from 'next/navigation';
+
 /**
  * RLS-style access rule (P0 Bugg 3): a dashboard is visible only to an
  * authenticated user whose Clerk org matches the dashboard's owning org.
@@ -25,5 +27,17 @@ export function assertDashboardAccess(user: AuthUser, dashboard: DashboardRecord
   }
   if (!user.orgId || user.orgId !== dashboard.orgId) {
     throw new AuthzError('Dashboard belongs to a different organization', 403);
+  }
+}
+
+/**
+ * Route-level guard for app/dashboard/[id]/page.tsx, where the route
+ * segment *is* the orgId. Deliberately renders a plain 404 instead of a
+ * 401/403 on mismatch — a differentiated status code would confirm to an
+ * unauthorized caller that a given org's dashboard exists at all.
+ */
+export function requireOrgAccess(routeOrgId: string, sessionOrgId: string | null | undefined): void {
+  if (!sessionOrgId || sessionOrgId !== routeOrgId) {
+    notFound();
   }
 }

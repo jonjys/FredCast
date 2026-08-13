@@ -22,3 +22,11 @@ export function formatSEK(value: number): string {
     maximumFractionDigits: 0,
   }).format(value);
 }
+
+export function formatPercent(value: number): string {
+  return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 1 }).format(value) + '%';
+}
+
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat('sv-SE').format(value);
+}

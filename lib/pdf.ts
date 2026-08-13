@@ -11,6 +11,7 @@ export type DashboardPdfInput = {
   title: string;
   totalSavedLabel: string;
   points: { date: string; value: number }[];
+  exportedBy?: string;
 };
 
 export async function generateDashboardPdf(input: DashboardPdfInput): Promise<Uint8Array> {
@@ -27,8 +28,17 @@ export async function generateDashboardPdf(input: DashboardPdfInput): Promise<Ui
     font,
     color: rgb(1, 1, 1),
   });
+  if (input.exportedBy) {
+    page.drawText(`Exporterad av: ${input.exportedBy}`, {
+      x: 50,
+      y: 725,
+      size: 10,
+      font,
+      color: rgb(0.6, 0.6, 0.6),
+    });
+  }
 
-  let y = 700;
+  let y = 695;
   for (const point of input.points) {
     if (y < 60) break;
     page.drawText(`${point.date}   ${point.value}`, { x: 50, y, size: 10, font, color: rgb(0.7, 0.7, 0.7) });
