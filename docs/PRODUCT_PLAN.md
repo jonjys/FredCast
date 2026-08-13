@@ -1,8 +1,28 @@
 # FredCast — "Universal Cast"
+
+## STATUS 2026-08-13: PROTOTYP KLAR, PIVOT PLANERAD
+
+Detta repo är en Universal Cast-prototyp för media.
+
+Affärsbeslut: FredCast pausas. Repot ska pivoteras till **fred-cast:
+Live-dashboards för FRED-platform**, Modul 3 Visualisering och Rapport.
+
+Se [`docs/PIVOT_PLAN.md`](PIVOT_PLAN.md) för migrering.
+
+Inga nya cast-features utvecklas tills vidare. Den fungerande
+prototypen (inkl. live-streaming) är taggad `v0.1.0-cast-prototype`
+för referens/rollback om affärsbeslutet ändras.
+
+---
+
 ### Produktplan, UX-arkitektur & prototyp (pre-build)
 
 > Status: Konceptfas. Ingen kod ska skrivas förrän detta dokument är godkänt.
 > Detta är grunden för allt kommande arbete i repot.
+>
+> _(Historisk status — se STATUS-sektionen ovan för nuläget. Produkten
+> byggdes vidare långt förbi konceptfasen innan pivot-beslutet; resten
+> av dokumentet nedan är kvar oredigerat som arkiv.)_
 
 ---
 
