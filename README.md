@@ -1,13 +1,30 @@
 # FredCast
 
+## STATUS 2026-08-13: PROTOTYP KLAR, PIVOT PLANERAD
+
+Detta repo är en Universal Cast-prototyp för media.
+
+Affärsbeslut: FredCast pausas. Repot ska pivoteras till **fred-cast:
+Live-dashboards för FRED-platform**, Modul 3 Visualisering och Rapport.
+
+Se [`docs/PIVOT_PLAN.md`](docs/PIVOT_PLAN.md) för migrering.
+
+Inga nya cast-features utvecklas tills vidare. Den fungerande
+prototypen (inkl. live-streaming) är taggad `v0.1.0-cast-prototype`
+för referens/rollback om affärsbeslutet ändras. `main` är frusen —
+allt via PR med gröna checks.
+
+---
+
 **Universal Cast** — världens enklaste sätt att streama och dela innehåll till
 en TV eller annan skärm. *Välj eller dela något → Välj skärm → Klart.* Ingen
 Chromecast/AirPlay/DLNA-kunskap krävs av användaren — appen avgör automatiskt
 hur innehållet skickas.
 
-Status: tidig utvecklingsfas. `mobile/` innehåller ett körbart Expo/React
-Native-skelett av MVP:t (navigation, designsystem, mock cast-motor) — se
-dokumenten nedan för produktplan, UX-flöden och arkitekturen det bygger på.
+Status (historisk, pre-pivot): `mobile/` innehåller ett körbart Expo/React
+Native-skelett av MVP:t (navigation, designsystem, mock cast-motor,
+live-streaming) — se dokumenten nedan för produktplan, UX-flöden och
+arkitekturen det bygger på.
 
 ## Dokumentation
 
