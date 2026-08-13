@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    env:
+      # Format-valid placeholders so `next build` doesn't fail resolving
+      # Clerk config. No real secret is used or required at build time —
+      # dashboard pages are force-dynamic, not statically prerendered.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktZG9tYWluLmNsZXJrLmFjY291bnRzLmRldiQ
+      CLERK_SECRET_KEY: sk_test_1234567890abcdefghijklmnopqrstuvwxyz1234
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test (P0 Bugg 1-4 + supporting coverage)
+        run: npm test
+
+      - name: Build
+        run: npm run build
