@@ -175,3 +175,24 @@ och deploya om. Nu funkar hela kedjan publikt: öppna receiver-URL:en på en
 TV/dator, skanna QR-koden med iPhonens Kamera-app, Safari öppnas på
 FredCast-appen redan ansluten — inget att skriva in, inget konto, inget
 Xcode.
+
+## Vercel Setup
+
+1. Project Settings → Framework Preset: Next.js
+2. Build Command: `npm run build`
+3. Output Directory: `.next`
+4. Install Command: `npm ci`
+5. Environment Variables:
+   ```
+   FRED_API_KEY=xxx
+   CLERK_SECRET_KEY=xxx
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=xxx
+   NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+   NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+   ```
+
+These need to be set manually in the Vercel dashboard by someone with
+project access — no available tooling can write project build settings
+or environment variables from this repo. `app/api/health` exposes
+`{ status: 'ok', env: !!process.env.FRED_API_KEY }` so a deploy's config
+can be checked with a single `curl` once these are in place.
