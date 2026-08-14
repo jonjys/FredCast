@@ -12,8 +12,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider>
       <html lang="sv">
         <head>
-          {/* Loaded at runtime, not build time — keeps `next build` from
-              needing network access to Google Fonts. */}
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link
             rel="stylesheet"
