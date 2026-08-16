@@ -57,6 +57,8 @@ Expo (React Native + TypeScript) — samma kodbas för iOS och Android
   har en praktisk storleksgräns i den här milstolpen; stora videor till en
   riktig Cast/DLNA-enhet kräver den lokala HTTP-servern i PRODUCT_PLAN.md §8,
   vilket är en native-modul-milstolpe, inte något pickers-lagret kan lösa).
+- **Live kamera** (`useLiveStream` + `LiveScreen`): filma från telefonen och
+  visa direkt på TV:n via WebRTC (web-läge just nu).
 
 ### Köra appen
 
@@ -97,64 +99,28 @@ en bild eller video från Bibliotek som vanligt — den renderas på riktigt i
 receiver-flikens `<img>`/`<video>`-tagg via relayn.
 
 Relayn bär bara korta JSON-kommandon (kod-parkoppling, media-URL,
-play/pause) — den lagrar inga konton eller historik och stänger rum
-automatiskt när båda sidor kopplat ner (se kommentarerna i
-`relay/server.js` och avvägningen i PRODUCT_PLAN.md §9).
+play/pause, WebRTC-signalling) — den lagrar inga konton eller historik och
+stänger rum automatiskt när båda sidor kopplat ner.
 
 ## Deploy (Vercel)
 
-Repot har `mobile/`, `relay/`, `receiver/` och `docs/` som syskonmappar utan
-någon egen build-konfiguration i repo-roten — Vercels zero-config-detektion
-hittar då inget att bygga där och ger 404. `package.json` och `vercel.json`
-i repo-roten löser det: build-kommandot kör `expo export --platform web`
-inne i `mobile/` och pekar Vercel på `mobile/dist` som output-mapp, med en
-SPA-rewrite så att appens klientsidiga rutter inte 404:ar vid en direkt
-länk/refresh.
+**Receiver ingår nu i samma deploy.** Efter build finns den på
+`https://fred-cast.vercel.app/receiver` — inget separat Vercel-projekt behövs.
+Öppna den URL:en på TV:n, skanna QR med telefonen, klart.
 
-Detta deployar bara **appens web-läge** (react-native-web) — inte relayn
-eller receiver-sidan, som behöver köras separat (se ovan) eller som egna
-Vercel-projekt om de ska nås publikt.
+Repot har `mobile/`, `relay/`, `receiver/` och `docs/` som syskonmappar.
+`package.json` och `vercel.json` i repo-roten: build kör `expo export` inne i
+`mobile/` och kopierar in `receiver/` till `mobile/dist/receiver`, med SPA-rewrite
+som skippar `/receiver`.
 
-## Gör QR/kod-casting publikt (gratis, ingen dator/Xcode krävs)
+Detta deployar **appens web-läge** + **receiver-sidan**. Relayn körs separat
+på Render (`render.yaml` → `wss://fredcast-relay.onrender.com/ws`).
 
-Lokalt (`localhost`) funkar bara på samma maskin/nätverk. För att kunna
-skanna QR-koden med iPhonens kamera och casta till en riktig TV var som
-helst — helt gratis, direkt i Safari, inget App Store-konto eller Mac
-behövs — deploya relayn och receiver-sidan var för sig:
+## Publikt flöde (gratis)
 
-**1. Relayn → Render.com (gratis webbtjänst)**
+1. **Relay** — redan på Render: `wss://fredcast-relay.onrender.com/ws`
+2. **Receiver** — `https://fred-cast.vercel.app/receiver` (samma projekt som appen)
+3. **App** — `https://fred-cast.vercel.app` (default relay är redan production)
 
-`render.yaml` i repo-roten är ett färdigt "Blueprint": logga in på
-[render.com](https://render.com) med ditt GitHub-konto, välj **New +
-Blueprint**, peka på det här repot — Render läser `render.yaml` automatiskt
-och deployar `relay/` som en gratis webbtjänst. Du får en URL i stil med
-`https://fredcast-relay.onrender.com`. Byt `ws://` mot `wss://` i den:
-`wss://fredcast-relay.onrender.com/ws`.
-
-*(Gratis-tiern på Render somnar efter inaktivitet och tar ~30–50 sekunder
-att vakna vid första anslutningen — helt okej för ett hobbyprojekt, märks
-bara som en kort fördröjning första gången TV-sidan öppnas efter ett tag.)*
-
-**2. Receiver-sidan → egen Vercel-app (statisk)**
-
-Skapa ett nytt Vercel-projekt som pekar på `receiver/` som root directory
-(inga build-inställningar behövs, det är bara statisk HTML). Du får en URL,
-t.ex. `https://fredcast-receiver.vercel.app`. Öppna den på TV:ns/datorns
-webbläsare med relay-adressen i frågesträngen:
-
-```
-https://fredcast-receiver.vercel.app/?relay=wss://fredcast-relay.onrender.com/ws&appUrl=https://fred-cast.vercel.app
-```
-
-**3. Appen → peka mot samma relay**
-
-I Vercel-projektet för `mobile/` (appen), lägg till en miljövariabel:
-
-```
-EXPO_PUBLIC_RELAY_WS_URL=wss://fredcast-relay.onrender.com/ws
-```
-
-och deploya om. Nu funkar hela kedjan publikt: öppna receiver-URL:en på en
-TV/dator, skanna QR-koden med iPhonens Kamera-app, Safari öppnas på
-FredCast-appen redan ansluten — inget att skriva in, inget konto, inget
-Xcode.
+Öppna receiver på TV:n → skanna QR med iPhone-kameran → Safari öppnar appen
+redan ansluten. Inget konto, inget Xcode.
