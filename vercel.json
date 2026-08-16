@@ -1,5 +1,8 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "mobile/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/receiver", "destination": "/receiver/index.html" },
+    { "source": "/((?!receiver/).*)", "destination": "/index.html" }
+  ]
 }

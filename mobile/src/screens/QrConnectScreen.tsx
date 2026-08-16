@@ -43,8 +43,8 @@ export function QrConnectScreen({ visible, onClose }: { visible: boolean; onClos
         </Pressable>
 
         <Text style={[styles.help, { color: t.colors.textDim }]}>
-          Öppna <Text style={{ color: t.colors.text, fontWeight: '700' }}>fredcast.app/receiver</Text> i webbläsaren på
-          din skärm och skriv in koden som visas där. Funkar även om ni är på olika nätverk.
+          Öppna <Text style={{ color: t.colors.text, fontWeight: '700' }}>fred-cast.vercel.app/receiver</Text> på
+          TV:n/datorn och skriv in koden som visas. Eller skanna QR-koden med telefonens kamera.
         </Text>
 
         <TextInput
