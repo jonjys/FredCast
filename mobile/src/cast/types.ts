@@ -22,7 +22,7 @@ export interface CastDevice {
   isFavorite: boolean;
 }
 
-export type MediaKind = 'image' | 'video' | 'file';
+export type MediaKind = 'image' | 'video' | 'file' | 'link';
 
 export interface MediaItem {
   id: string;
