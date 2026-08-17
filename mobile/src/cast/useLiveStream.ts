@@ -4,15 +4,18 @@ import { useCast, pwaReceiverAdapter } from './CastProvider';
 
 export type LiveStreamStatus = 'idle' | 'requesting-camera' | 'connecting' | 'live' | 'error';
 
-// Same public STUN as receiver/index.html — discovers NAT addresses only.
-// Same-Wi-Fi ("hemma") for this version; cross-network needs TURN.
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 };
 
+function sdpPlain(desc: RTCSessionDescription | RTCSessionDescriptionInit | null) {
+  if (!desc) return null;
+  return { type: desc.type, sdp: desc.sdp };
+}
+
 /**
- * Live camera → paired PwaReceiver screen over WebRTC, signalled via relay.
- * Web-only (browser getUserMedia / RTCPeerConnection).
+ * Live camera → paired PwaReceiver over WebRTC via relay.
+ * Fixes: plain SDP, ICE buffer, resilient sendRaw, clearer errors.
  */
 export function useLiveStream() {
   const { connectedDevice } = useCast();
@@ -44,28 +47,21 @@ export function useLiveStream() {
       try {
         pwaReceiverAdapter.sendRaw(connectedDevice.id, { type: 'control', command: 'stop-live' });
       } catch {
-        // Socket may already be closed — fine.
+        /* socket closed */
       }
     }
 
-    try {
-      pcRef.current?.close();
-    } catch {
-      /* ignore */
-    }
+    try { pcRef.current?.close(); } catch { /* ignore */ }
     pcRef.current = null;
 
     streamRef.current?.getTracks().forEach((track) => {
-      try {
-        track.stop();
-      } catch {
-        /* ignore */
-      }
+      try { track.stop(); } catch { /* ignore */ }
     });
     streamRef.current = null;
 
     if (previewRef.current) previewRef.current.srcObject = null;
     setStatus('idle');
+    setError(null);
   }, [connectedDevice]);
 
   const start = useCallback(
@@ -81,15 +77,10 @@ export function useLiveStream() {
         return;
       }
 
-      // Clean previous session if any.
       clearAnswerTimeout();
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
-      try {
-        pcRef.current?.close();
-      } catch {
-        /* ignore */
-      }
+      try { pcRef.current?.close(); } catch { /* ignore */ }
       pcRef.current = null;
       pendingIceRef.current = [];
       remoteSetRef.current = false;
@@ -99,10 +90,15 @@ export function useLiveStream() {
       previewRef.current = previewEl;
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: true,
-        });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: true,
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
         streamRef.current = stream;
         if (previewEl) {
           previewEl.srcObject = stream;
@@ -118,45 +114,49 @@ export function useLiveStream() {
 
         pc.onicecandidate = (event) => {
           if (event.candidate) {
-            try {
-              pwaReceiverAdapter.sendRaw(connectedDevice.id, {
-                type: 'webrtc-ice',
-                candidate: event.candidate,
-              });
-            } catch {
-              /* socket gone */
-            }
+            pwaReceiverAdapter.sendRaw(connectedDevice.id, {
+              type: 'webrtc-ice',
+              candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate,
+            });
           }
         };
 
         pc.onconnectionstatechange = () => {
-          if (pc.connectionState === 'connected') {
+          const state = pc.connectionState;
+          if (state === 'connected') {
             clearAnswerTimeout();
             setStatus('live');
+            setError(null);
+          } else if (state === 'failed') {
+            setError('WebRTC-anslutningen misslyckades (ICE). Är telefon och TV på samma Wi-Fi?');
+            setStatus('error');
           }
-          if (pc.connectionState === 'failed') {
-            setError('Anslutningen till skärmen tappades.');
+        };
+
+        pc.oniceconnectionstatechange = () => {
+          if (pc.iceConnectionState === 'failed') {
+            setError('ICE misslyckades. Samma Wi-Fi? Öppna receiver igen och starta om live.');
             setStatus('error');
           }
         };
 
         unsubscribeRef.current = pwaReceiverAdapter.onMessage(connectedDevice.id, (msg) => {
           if (msg.type === 'webrtc-answer' && msg.sdp) {
+            const sdp = msg.sdp as RTCSessionDescriptionInit;
             pc
-              .setRemoteDescription(new RTCSessionDescription(msg.sdp as RTCSessionDescriptionInit))
+              .setRemoteDescription(new RTCSessionDescription(sdp))
               .then(async () => {
                 remoteSetRef.current = true;
                 const buffered = pendingIceRef.current;
                 pendingIceRef.current = [];
                 for (const c of buffered) {
-                  try {
-                    await pc.addIceCandidate(new RTCIceCandidate(c));
-                  } catch {
-                    /* ignore bad candidate */
-                  }
+                  try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch { /* ignore */ }
                 }
               })
-              .catch(() => undefined);
+              .catch((err) => {
+                setError('Kunde inte sätta answer från skärmen: ' + (err?.message || String(err)));
+                setStatus('error');
+              });
           }
           if (msg.type === 'webrtc-ice' && msg.candidate) {
             const candidate = msg.candidate as RTCIceCandidateInit;
@@ -168,30 +168,34 @@ export function useLiveStream() {
           }
         });
 
-        // If TV never answers (tab closed / relay drop), fail clearly.
         answerTimeoutRef.current = setTimeout(() => {
           if (pcRef.current && pcRef.current.connectionState !== 'connected') {
-            setError('Skärmen svarade inte. Öppna receiver-sidan igen och starta om live.');
+            setError(
+              'Skärmen svarade inte inom 25s. Öppna https://fred-cast.vercel.app/receiver, behåll fliken öppen, och starta live igen.',
+            );
             setStatus('error');
-            try {
-              pc.close();
-            } catch {
-              /* ignore */
-            }
+            try { pc.close(); } catch { /* ignore */ }
           }
-        }, 20000);
+        }, 25000);
 
         const offer = await pc.createOffer({
           offerToReceiveAudio: false,
           offerToReceiveVideo: false,
         });
         await pc.setLocalDescription(offer);
+        await new Promise((r) => setTimeout(r, 150));
+
         pwaReceiverAdapter.sendRaw(connectedDevice.id, {
           type: 'webrtc-offer',
-          sdp: pc.localDescription,
+          sdp: sdpPlain(pc.localDescription),
         });
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Kunde inte starta kameran.');
+        const msg = e instanceof Error ? e.message : 'Kunde inte starta kameran.';
+        if (/Permission|NotAllowed|denied/i.test(msg)) {
+          setError('Kameran blockerades. Tillåt kamera i webbläsaren och försök igen.');
+        } else {
+          setError(msg);
+        }
         setStatus('error');
         stop();
       }
