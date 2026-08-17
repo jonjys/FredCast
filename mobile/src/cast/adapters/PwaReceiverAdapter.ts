@@ -1,14 +1,11 @@
 import { CastAdapter, CastDevice, MediaItem, PlaybackCommand } from '../types';
 
-/**
- * The universal fallback adapter (PRODUCT_PLAN.md §8-9, MVP_BACKLOG.md Epic
- * 1 P1 & Epic 7) — pairs with a FredCast Receiver page (any browser: Smart
- * TV, Fire TV Silk, a laptop) via a short code, then sends media/control
- * commands over a plain WebSocket relay.
- *
- * Render free-tier relay can take 30–50s to wake after idle — pair timeout
- * is intentionally long and surfaces that in the error message.
- */
+const STORAGE_KEY = 'fredcast_session_v3';
+const HEARTBEAT_MS = 10000;
+const RECONNECT_MS = 2500;
+
+type StoredSession = { code: string; deviceId: string; savedAt: number };
+
 export class PwaReceiverAdapter implements CastAdapter {
   readonly protocol = 'pwa-receiver' as const;
 
@@ -16,8 +13,11 @@ export class PwaReceiverAdapter implements CastAdapter {
   private onChange: ((devices: CastDevice[]) => void) | null = null;
   private devices = new Map<string, CastDevice>();
   private sockets = new Map<string, WebSocket>();
-  /** Raw socket message listeners, keyed by device — used for WebRTC signalling. */
   private messageListeners = new Map<string, Set<(msg: Record<string, unknown>) => void>>();
+  private heartbeats = new Map<string, ReturnType<typeof setInterval>>();
+  private reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private intentionalClose = new Set<string>();
+  private codes = new Map<string, string>();
 
   constructor(relayUrl: string) {
     this.relayUrl = relayUrl;
@@ -26,35 +26,66 @@ export class PwaReceiverAdapter implements CastAdapter {
   startDiscovery(onChange: (devices: CastDevice[]) => void): () => void {
     this.onChange = onChange;
     onChange(Array.from(this.devices.values()));
+    setTimeout(() => this.restoreSession(), 0);
     return () => {
       this.onChange = null;
     };
   }
 
-  /**
-   * Pair with a receiver by the 6-digit code shown on its screen.
-   * Resolves once the relay confirms we joined the room. Peer readiness
-   * arrives later as peer-status and flips status connecting → ready.
-   */
+  private storageGet(): StoredSession | null {
+    try {
+      if (typeof localStorage === 'undefined') return null;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw) as StoredSession;
+      if (!s?.code || Date.now() - s.savedAt > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+      }
+      return s;
+    } catch {
+      return null;
+    }
+  }
+
+  private storageSet(code: string, deviceId: string) {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ code, deviceId, savedAt: Date.now() }));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private storageClear() {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private restoreSession() {
+    const s = this.storageGet();
+    if (!s) return;
+    this.pairWithCode(s.code).catch(() => undefined);
+  }
+
   pairWithCode(code: string): Promise<CastDevice> {
     const digits = code.replace(/\D/g, '');
-    if (digits.length !== 6) {
-      return Promise.reject(new Error('Koden måste vara 6 siffror.'));
-    }
-
-    // Re-pairing the same code: drop the old socket first so we don't leak.
+    if (digits.length !== 6) return Promise.reject(new Error('Koden måste vara 6 siffror.'));
     const deviceId = `pwa-${digits}`;
+    this.intentionalClose.delete(deviceId);
+    this.clearReconnect(deviceId);
+    this.clearHeartbeat(deviceId);
     const existing = this.sockets.get(deviceId);
     if (existing) {
-      try {
-        existing.close();
-      } catch {
-        /* ignore */
-      }
+      this.intentionalClose.add(deviceId);
+      try { existing.close(); } catch { /* ignore */ }
       this.sockets.delete(deviceId);
-      this.messageListeners.delete(deviceId);
+      this.intentionalClose.delete(deviceId);
     }
-
+    this.codes.set(deviceId, digits);
     return this.openPairSocket(digits, deviceId, 0);
   }
 
@@ -62,28 +93,16 @@ export class PwaReceiverAdapter implements CastAdapter {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(this.relayUrl);
       let settled = false;
-
-      // Render free tier cold start ≈ 30–50s; give it room, then one retry.
       const timeoutMs = attempt === 0 ? 45000 : 25000;
-
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          try {
-            socket.close();
-          } catch {
-            /* ignore */
-          }
+          try { socket.close(); } catch { /* ignore */ }
           if (attempt === 0) {
-            // One automatic retry — first attempt often just wakes the relay.
             this.openPairSocket(digits, deviceId, 1).then(resolve, reject);
             return;
           }
-          reject(
-            new Error(
-              'Kunde inte nå FredCast-relayn (den kan ha sovit). Vänta 10 sek och försök igen med samma kod.',
-            ),
-          );
+          reject(new Error('Kunde inte nå FredCast-relayn (den kan ha sovit). Vänta 10 sek och försök igen med samma kod.'));
         }
       }, timeoutMs);
 
@@ -93,16 +112,14 @@ export class PwaReceiverAdapter implements CastAdapter {
 
       socket.onmessage = (event) => {
         let msg: Record<string, unknown>;
-        try {
-          msg = JSON.parse(String(event.data));
-        } catch {
-          return;
-        }
+        try { msg = JSON.parse(String(event.data)); } catch { return; }
 
         if (msg.type === 'joined' && !settled) {
           settled = true;
           clearTimeout(timeout);
           this.sockets.set(deviceId, socket);
+          this.storageSet(digits, deviceId);
+          this.startHeartbeat(deviceId);
           const device: CastDevice = {
             id: deviceId,
             name: `Skärm (kod ${digits.slice(0, 3)} ${digits.slice(3)})`,
@@ -120,10 +137,7 @@ export class PwaReceiverAdapter implements CastAdapter {
         if (msg.type === 'peer-status') {
           const device = this.devices.get(deviceId);
           if (device) {
-            this.devices.set(deviceId, {
-              ...device,
-              status: msg.connected ? 'ready' : 'connecting',
-            });
+            this.devices.set(deviceId, { ...device, status: msg.connected ? 'ready' : 'connecting' });
             this.emit();
           }
         }
@@ -144,18 +158,49 @@ export class PwaReceiverAdapter implements CastAdapter {
       };
 
       socket.onclose = () => {
-        if (!settled) {
-          // Closed before join — treat as error path (timeout/retry handles it).
-          return;
-        }
+        this.clearHeartbeat(deviceId);
+        this.sockets.delete(deviceId);
+        if (!settled) return;
         const device = this.devices.get(deviceId);
         if (device) {
-          this.devices.set(deviceId, { ...device, status: 'unavailable' });
+          this.devices.set(deviceId, { ...device, status: 'connecting' });
           this.emit();
         }
-        this.sockets.delete(deviceId);
+        if (!this.intentionalClose.has(deviceId)) this.scheduleReconnect(deviceId, digits);
       };
     });
+  }
+
+  private startHeartbeat(deviceId: string) {
+    this.clearHeartbeat(deviceId);
+    const id = setInterval(() => {
+      try {
+        const s = this.sockets.get(deviceId);
+        if (s && s.readyState === s.OPEN) s.send(JSON.stringify({ type: 'ping' }));
+      } catch { /* ignore */ }
+    }, HEARTBEAT_MS);
+    this.heartbeats.set(deviceId, id);
+  }
+
+  private clearHeartbeat(deviceId: string) {
+    const id = this.heartbeats.get(deviceId);
+    if (id) clearInterval(id);
+    this.heartbeats.delete(deviceId);
+  }
+
+  private scheduleReconnect(deviceId: string, digits: string) {
+    this.clearReconnect(deviceId);
+    const t = setTimeout(() => {
+      this.reconnectTimers.delete(deviceId);
+      this.openPairSocket(digits, deviceId, 0).catch(() => this.scheduleReconnect(deviceId, digits));
+    }, RECONNECT_MS);
+    this.reconnectTimers.set(deviceId, t);
+  }
+
+  private clearReconnect(deviceId: string) {
+    const t = this.reconnectTimers.get(deviceId);
+    if (t) clearTimeout(t);
+    this.reconnectTimers.delete(deviceId);
   }
 
   private emit() {
@@ -165,33 +210,44 @@ export class PwaReceiverAdapter implements CastAdapter {
   private socketFor(deviceId: string): WebSocket {
     const socket = this.sockets.get(deviceId);
     if (!socket || socket.readyState !== socket.OPEN) {
-      throw new Error('Anslutningen till skärmen är inte klar.');
+      throw new Error('Anslutningen till skärmen är inte klar — återansluter…');
     }
     return socket;
   }
 
-  async connect(_deviceId: string): Promise<void> {
-    // Pairing already establishes the connection in pairWithCode().
+  private async ensureSocket(deviceId: string): Promise<WebSocket> {
+    const existing = this.sockets.get(deviceId);
+    if (existing && existing.readyState === existing.OPEN) return existing;
+    const code = this.codes.get(deviceId) || deviceId.replace(/^pwa-/, '');
+    if (code.length === 6) await this.openPairSocket(code, deviceId, 0);
+    return this.socketFor(deviceId);
   }
 
+  async connect(_deviceId: string): Promise<void> {}
+
   async sendMedia(deviceId: string, item: MediaItem): Promise<void> {
-    this.socketFor(deviceId).send(JSON.stringify({ type: 'media', item }));
+    const socket = await this.ensureSocket(deviceId);
+    if (item.uri?.startsWith('data:') && item.uri.length > 6_000_000) {
+      throw new Error('Filen är för stor att casta via relay (max ~4 MB). Välj en mindre fil.');
+    }
+    socket.send(JSON.stringify({ type: 'media', item }));
   }
 
   async control(deviceId: string, command: PlaybackCommand, value?: number): Promise<void> {
-    this.socketFor(deviceId).send(JSON.stringify({ type: 'control', command, value }));
+    const socket = await this.ensureSocket(deviceId);
+    socket.send(JSON.stringify({ type: 'control', command, value }));
   }
 
   async disconnect(deviceId: string): Promise<void> {
-    const socket = this.sockets.get(deviceId);
-    try {
-      socket?.close();
-    } catch {
-      /* ignore */
-    }
+    this.intentionalClose.add(deviceId);
+    this.clearReconnect(deviceId);
+    this.clearHeartbeat(deviceId);
+    this.storageClear();
+    try { this.sockets.get(deviceId)?.close(); } catch { /* ignore */ }
     this.sockets.delete(deviceId);
     this.devices.delete(deviceId);
     this.messageListeners.delete(deviceId);
+    this.codes.delete(deviceId);
     this.emit();
   }
 
