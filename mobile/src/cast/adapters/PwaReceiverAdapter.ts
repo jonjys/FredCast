@@ -251,8 +251,20 @@ export class PwaReceiverAdapter implements CastAdapter {
     this.emit();
   }
 
+  /** Fire-and-forget signalling (WebRTC). Auto-reconnects if socket dropped mid-heartbeat. */
   sendRaw(deviceId: string, msg: Record<string, unknown>): void {
-    this.socketFor(deviceId).send(JSON.stringify(msg));
+    const trySend = (socket: WebSocket) => {
+      if (socket.readyState === socket.OPEN) {
+        socket.send(JSON.stringify(msg));
+        return true;
+      }
+      return false;
+    };
+    const existing = this.sockets.get(deviceId);
+    if (existing && trySend(existing)) return;
+    void this.ensureSocket(deviceId)
+      .then((s) => { trySend(s); })
+      .catch(() => { /* live surfaces timeout if offer never lands */ });
   }
 
   onMessage(deviceId: string, listener: (msg: Record<string, unknown>) => void): () => void {
