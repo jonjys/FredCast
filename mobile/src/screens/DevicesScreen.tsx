@@ -16,7 +16,7 @@ export function DevicesScreen({
   onOpenScan?: () => void;
 }) {
   const t = useTheme();
-  const { groupedDevices, connectedDevice, connect, toggleFavorite } = useCast();
+  const { groupedDevices, connectedDevice, connect, toggleFavorite, queue } = useCast();
 
   const handlePress = (device: CastDevice) => {
     if (device.status === 'ready' || device.status === 'connecting') connect(device.id);
@@ -61,6 +61,7 @@ export function DevicesScreen({
         <View style={[styles.banner, { backgroundColor: t.colors.surface, borderColor: t.colors.border }]}>
           <Text style={{ color: t.colors.text, fontWeight: '700' }}>
             🟢 Ansluten till {connectedDevice.name}
+            {queue.length > 0 ? `  •  ${queue.length} i kö` : ''}
           </Text>
           <Text style={{ color: t.colors.textDim, fontSize: 12, marginTop: 2 }}>
             Session sparad 24h — återansluter automatiskt
