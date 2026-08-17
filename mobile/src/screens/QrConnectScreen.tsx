@@ -5,10 +5,9 @@ import { useCast } from '../cast/CastProvider';
 import { Icon } from '../icons/Icon';
 
 /**
- * QR/kod-anslutning — universell fallback när mDNS/DLNA inte hittar skärmen
- * (§9, Epic 7). Användaren läser en 6-siffrig kod på TV:ns FredCast Receiver
- * -sida och skriver in den här; pairWithCode ansluter via relayn på riktigt
- * (PwaReceiverAdapter), det är inte längre bara en visuell mockup.
+ * QR/kod-anslutning — 6-siffrig kod från TV receiver.
+ * BUG-2: letterSpacing var för stor och klippte sista siffran på mobil.
+ * Vi lagrar alltid råa 6 siffror utan mellanslag mot relayn.
  */
 export function QrConnectScreen({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const t = useTheme();
@@ -16,8 +15,9 @@ export function QrConnectScreen({ visible, onClose }: { visible: boolean; onClos
   const [code, setCode] = useState('');
   const [connected, setConnected] = useState(false);
 
+  const digits = code.replace(/\D/g, '').slice(0, 6);
+
   const handleConnect = async () => {
-    const digits = code.replace(/\D/g, '');
     if (digits.length !== 6) return;
     try {
       await pairWithCode(digits);
@@ -44,35 +44,54 @@ export function QrConnectScreen({ visible, onClose }: { visible: boolean; onClos
 
         <Text style={[styles.help, { color: t.colors.textDim }]}>
           Öppna <Text style={{ color: t.colors.text, fontWeight: '700' }}>fred-cast.vercel.app/receiver</Text> på
-          TV:n/datorn och skriv in koden som visas. Eller skanna QR-koden med telefonens kamera.
+          TV:n/datorn och skriv in de 6 siffrorna. Eller skanna QR-koden med telefonens kamera.
         </Text>
 
         <TextInput
-          value={code}
+          value={digits}
           onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
           placeholder="482019"
           placeholderTextColor={t.colors.textFaint}
           keyboardType="number-pad"
           maxLength={6}
-          style={[styles.input, { color: t.colors.text, borderColor: t.colors.border, backgroundColor: t.colors.surface }]}
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
+          importantForAutofill="yes"
+          style={[
+            styles.input,
+            { color: t.colors.text, borderColor: t.colors.border, backgroundColor: t.colors.surface },
+          ]}
         />
+
+        <Text style={[styles.digitCount, { color: t.colors.textFaint }]}>
+          {digits.length}/6 siffror
+        </Text>
 
         <Pressable
           onPress={handleConnect}
-          disabled={code.length !== 6 || pairing}
+          disabled={digits.length !== 6 || pairing}
           style={[
             styles.connectBtn,
-            { backgroundColor: t.colors.accent, opacity: code.length !== 6 || pairing ? 0.5 : 1 },
+            { backgroundColor: t.colors.accent, opacity: digits.length !== 6 || pairing ? 0.5 : 1 },
           ]}
         >
           {pairing ? (
-            <ActivityIndicator color="#fff" />
+            <View style={styles.pairingRow}>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.connectLabel}>Väcker relay…</Text>
+            </View>
           ) : connected ? (
             <Text style={styles.connectLabel}>Ansluten ✓</Text>
           ) : (
             <Text style={styles.connectLabel}>Anslut</Text>
           )}
         </Pressable>
+
+        {pairing ? (
+          <Text style={[styles.hint, { color: t.colors.textDim }]}>
+            Första gången efter vila kan det ta 30–45 sek medan relayn vaknar.
+          </Text>
+        ) : null}
 
         {lastError ? <Text style={[styles.error, { color: t.colors.danger }]}>{lastError}</Text> : null}
       </View>
@@ -89,13 +108,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingVertical: 16,
-    fontSize: 24,
+    paddingHorizontal: 12,
+    fontSize: 28,
     fontFamily: 'monospace',
-    letterSpacing: 6,
+    // letterSpacing > 4 klippte sista siffran på smala skärmar (BUG-2)
+    letterSpacing: 2,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
+  digitCount: { fontSize: 12, marginBottom: 16 },
   connectBtn: { width: '100%', borderRadius: 999, paddingVertical: 15, alignItems: 'center' },
+  pairingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   connectLabel: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  hint: { fontSize: 12, textAlign: 'center', marginTop: 14, maxWidth: 280, lineHeight: 17 },
   error: { fontSize: 12, textAlign: 'center', marginTop: 16, maxWidth: 280 },
 });
