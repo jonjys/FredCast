@@ -6,11 +6,8 @@
 <title>FredCast Receiver</title>
 <style>
   :root {
-    --bg: #0B0B10;
-    --text: #F3F1EE;
-    --text-dim: #9B98A6;
-    --accent: #7C6FEE;
-    --ready: #35D28A;
+    --bg: #0B0B10; --text: #F3F1EE; --text-dim: #9B98A6;
+    --accent: #7C6FEE; --ready: #35D28A;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -35,9 +32,7 @@
     min-width: 232px; min-height: 232px;
     display: flex; align-items: center; justify-content: center;
   }
-  #qrWrap img, #qrWrap svg {
-    width: 200px; height: 200px; display: block;
-  }
+  #qrWrap img, #qrWrap svg { width: 200px; height: 200px; display: block; }
   #code {
     font-family: ui-monospace, "SF Mono", monospace;
     font-size: 1.6rem; letter-spacing: 0.15em; font-weight: 700;
@@ -46,25 +41,25 @@
   #hint { color: var(--text-dim); font-size: 1.05rem; max-width: 34ch; }
   #status {
     position: fixed; top: 20px; right: 24px; display: flex; align-items: center; gap: 8px;
-    font-size: 0.85rem; color: var(--text-dim);
+    font-size: 0.85rem; color: var(--text-dim); z-index: 20;
   }
   #status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
   #status .dot.on { background: var(--ready); }
   #filename {
     position: fixed; bottom: 24px; left: 0; right: 0; text-align: center;
-    color: var(--text-dim); font-size: 0.9rem;
+    color: var(--text-dim); font-size: 0.9rem; z-index: 20;
   }
   #liveBadge {
     position: fixed; top: 20px; left: 24px; display: none; align-items: center; gap: 6px;
     font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; color: #fff;
-    background: #e0393e; padding: 5px 10px 5px 8px; border-radius: 999px;
+    background: #e0393e; padding: 5px 10px 5px 8px; border-radius: 999px; z-index: 20;
   }
   #liveBadge .liveDot { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
   #liveBadge.on { display: flex; }
   #unmuteBtn {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
     display: none; align-items: center; gap: 8px; background: rgba(0,0,0,0.65);
-    color: #fff; border: none; border-radius: 999px; padding: 10px 18px; font-size: 0.85rem;
+    color: #fff; border: none; border-radius: 999px; padding: 10px 18px; font-size: 0.85rem; z-index: 25;
   }
   #unmuteBtn.show { display: flex; }
 </style>
@@ -108,10 +103,7 @@
     const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
     function stopLiveStream() {
-      if (pc) {
-        try { pc.close(); } catch (e) {}
-        pc = null;
-      }
+      if (pc) { try { pc.close(); } catch (e) {} pc = null; }
       pendingIce = [];
       remoteReady = false;
       liveBadgeEl.classList.remove('on');
@@ -125,6 +117,10 @@
       placeholderEl.style.display = 'none';
       filenameEl.textContent = '';
 
+      if (pc) { try { pc.close(); } catch (e) {} pc = null; }
+      pendingIce = [];
+      remoteReady = false;
+
       pc = new RTCPeerConnection(RTC_CONFIG);
       let liveVideoEl = null;
 
@@ -134,65 +130,72 @@
           liveVideoEl.autoplay = true;
           liveVideoEl.playsInline = true;
           liveVideoEl.muted = true;
+          liveVideoEl.setAttribute('playsinline', '');
+          liveVideoEl.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;background:#000;';
           stageEl.appendChild(liveVideoEl);
           liveBadgeEl.classList.add('on');
           unmuteBtnEl.classList.add('show');
           unmuteBtnEl.onclick = () => {
             liveVideoEl.muted = false;
+            liveVideoEl.play().catch(function(){});
             unmuteBtnEl.classList.remove('show');
           };
         }
-        liveVideoEl.srcObject = event.streams[0];
+        var stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream([event.track]);
+        liveVideoEl.srcObject = stream;
+        liveVideoEl.play().catch(function(){});
       };
 
       pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          ws.send(JSON.stringify({ type: 'webrtc-ice', candidate: event.candidate }));
+        if (event.candidate && ws && ws.readyState === 1) {
+          var cand = event.candidate.toJSON ? event.candidate.toJSON() : event.candidate;
+          ws.send(JSON.stringify({ type: 'webrtc-ice', candidate: cand }));
         }
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc && (pc.connectionState === 'closed' || pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) {
+        if (pc && (pc.connectionState === 'closed' || pc.connectionState === 'failed')) {
           stopLiveStream();
         }
       };
 
-      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      remoteReady = true;
-      for (const c of pendingIce) {
-        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        remoteReady = true;
+        for (const c of pendingIce) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+        }
+        pendingIce = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({
+            type: 'webrtc-answer',
+            sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp }
+          }));
+        }
+      } catch (err) {
+        console.error('handleOffer failed', err);
+        stopLiveStream();
       }
-      pendingIce = [];
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      ws.send(JSON.stringify({ type: 'webrtc-answer', sdp: pc.localDescription }));
     }
 
-    /** Always draw a scannable QR — img data-URI is the most reliable path on TV browsers. */
     function renderQr(pairUrl) {
       try {
-        if (typeof qrcode !== 'function') {
-          throw new Error('qrcode lib missing');
-        }
+        if (typeof qrcode !== 'function') throw new Error('qrcode lib missing');
         const qr = qrcode(0, 'M');
         qr.addData(pairUrl);
         qr.make();
-        // createImgTag(cellSize, margin) — positional args; returns <img src="data:image/gif;base64,...">
         qrWrapEl.innerHTML = qr.createImgTag(6, 4);
         const img = qrWrapEl.querySelector('img');
         if (img) {
-          img.width = 200;
-          img.height = 200;
-          img.style.width = '200px';
-          img.style.height = '200px';
+          img.width = 200; img.height = 200;
+          img.style.width = '200px'; img.style.height = '200px';
           img.alt = 'Skanna för att ansluta FredCast';
         }
       } catch (e) {
-        // Last-resort: external QR API so the box is never empty
         const img = document.createElement('img');
-        img.width = 200;
-        img.height = 200;
-        img.alt = 'QR';
+        img.width = 200; img.height = 200; img.alt = 'QR';
         img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(pairUrl);
         qrWrapEl.innerHTML = '';
         qrWrapEl.appendChild(img);
@@ -214,10 +217,7 @@
         clearTimeout(t);
         const data = await res.json();
         if (data && data.code && String(data.code).length === 6) return String(data.code);
-      } catch (e) {
-        /* fall through to local */
-      }
-      // Local 6-digit so QR always shows even if relay is cold/down
+      } catch (e) {}
       return localCode();
     }
 
@@ -254,7 +254,7 @@
         video.controls = true;
         video.style.cssText = 'max-width:100%;max-height:100%;';
         stageEl.appendChild(video);
-      } else if (item.kind === 'link' || (item.uri && /^https?:\/\//i.test(item.uri) && !item.uri.startsWith('data:'))) {
+      } else if (item.kind === 'link' || (item.uri && /^https?:\/\/i.test(item.uri) && !item.uri.startsWith('data:'))) {
         const iframe = document.createElement('iframe');
         iframe.src = item.uri;
         iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
@@ -271,7 +271,7 @@
       ws = new WebSocket(relayUrl);
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'join', code, role: 'receiver' }));
+        ws.send(JSON.stringify({ type: 'join', code: code, role: 'receiver' }));
       };
 
       ws.onmessage = (event) => {
@@ -280,55 +280,42 @@
         if (msg.type === 'joined') {
           code = String(msg.code);
           codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
-          const pairUrl = appUrl + '/?connectCode=' + code;
-          renderQr(pairUrl);
+          renderQr(appUrl + '/?connectCode=' + code);
           statusText.textContent = 'Väntar på telefon…';
         }
 
         if (msg.type === 'peer-status') {
-          statusDot.classList.toggle('on', msg.connected);
+          statusDot.classList.toggle('on', !!msg.connected);
           statusText.textContent = msg.connected ? 'Telefon ansluten' : 'Väntar på telefon…';
         }
 
-        if (msg.type === 'media') {
-          renderMedia(msg.item);
-        }
+        if (msg.type === 'media') renderMedia(msg.item);
 
         if (msg.type === 'control') {
           const video = stageEl.querySelector('video');
-          if (msg.command === 'stop-live') {
-            stopLiveStream();
-            return;
-          }
+          if (msg.command === 'stop-live') { stopLiveStream(); return; }
           if (!video) return;
           if (msg.command === 'play') video.play();
           if (msg.command === 'pause') video.pause();
         }
 
-        if (msg.type === 'webrtc-offer') {
-          handleOffer(msg.sdp);
-        }
+        if (msg.type === 'webrtc-offer') handleOffer(msg.sdp);
 
         if (msg.type === 'webrtc-ice' && msg.candidate) {
-          if (!pc || !remoteReady) {
-            pendingIce.push(msg.candidate);
-          } else {
-            pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
-          }
+          if (!pc || !remoteReady) pendingIce.push(msg.candidate);
+          else pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(function(){});
         }
       };
 
       ws.onclose = () => {
         statusDot.classList.remove('on');
         statusText.textContent = 'Frånkopplad — återansluter…';
-        stopLiveStream();
         setTimeout(connect, 1500);
       };
 
       ws.onerror = () => ws.close();
     }
 
-    // Show code + QR immediately, even before WS is up
     ensureCode().then((c) => {
       code = String(c).replace(/\D/g, '').slice(0, 6);
       if (code.length !== 6) code = localCode();
