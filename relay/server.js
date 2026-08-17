@@ -1,26 +1,14 @@
 /**
- * FredCast Relay — pairing + signalling server for the PWA Receiver fallback
- * (PRODUCT_PLAN.md §8-9, MVP_BACKLOG.md Epic 7). This is the universal
- * fallback: when mDNS/SSDP discovery finds nothing (guest Wi-Fi, VLAN
- * isolation, iOS Local Network permission denied) — or when the target
- * screen has no Cast/AirPlay/DLNA support at all — the user opens the
- * receiver page on the screen, gets a short code, and the phone "casts" by
- * sending JSON media/control messages through this relay.
- *
- * Deliberately dumb: this server holds no media, no accounts, no history —
- * only a short-lived room keyed by a 6-digit code, relaying JSON messages
- * between exactly one sender (phone) and one receiver (TV browser tab).
- * Metadata-only relay, as described in §9's integrity tradeoff — full media
- * bytes for local files still travel sender -> receiver directly once a
- * real device is involved; this relay only carries small JSON commands.
+ * FredCast Relay v3 — pairing + signalling + heartbeat + multi-peer rooms.
+ * Room TTL 24h so a TV can stay paired all day.
  */
 const http = require('http');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 8787;
-const ROOM_TTL_MS = 30 * 60 * 1000;
+const ROOM_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** @type {Map<string, { sender: import('ws')|null, receiver: import('ws')|null, createdAt: number }>} */
+/** @type {Map<string, { senders: Set<import('ws')>, receivers: Set<import('ws')>, createdAt: number, lastActive: number }>} */
 const rooms = new Map();
 
 function makeCode() {
@@ -34,18 +22,30 @@ function makeCode() {
 function getOrCreateRoom(code) {
   let room = rooms.get(code);
   if (!room) {
-    room = { sender: null, receiver: null, createdAt: Date.now() };
+    room = { senders: new Set(), receivers: new Set(), createdAt: Date.now(), lastActive: Date.now() };
     rooms.set(code, room);
   }
   return room;
 }
 
 function send(ws, msg) {
-  if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
+  if (ws && ws.readyState === 1) {
+    try { ws.send(JSON.stringify(msg)); } catch { /* ignore */ }
+  }
 }
 
-function peerOf(room, role) {
-  return role === 'sender' ? room.receiver : room.sender;
+function broadcast(peers, msg, except) {
+  for (const ws of peers) {
+    if (ws !== except) send(ws, msg);
+  }
+}
+
+function peerStatus(room) {
+  return {
+    senders: room.senders.size,
+    receivers: room.receivers.size,
+    connected: room.senders.size > 0 && room.receivers.size > 0,
+  };
 }
 
 const CORS_HEADERS = {
@@ -61,7 +61,7 @@ const server = http.createServer((req, res) => {
   }
   if (req.url === '/health') {
     res.writeHead(200, { ...CORS_HEADERS, 'content-type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
+    res.end(JSON.stringify({ ok: true, rooms: rooms.size, version: 3 }));
     return;
   }
   if (req.url === '/new-code') {
@@ -89,37 +89,49 @@ wss.on('connection', (ws) => {
       return;
     }
 
+    if (msg.type === 'ping') {
+      send(ws, { type: 'pong', t: Date.now() });
+      if (joinedCode) {
+        const room = rooms.get(joinedCode);
+        if (room) room.lastActive = Date.now();
+      }
+      return;
+    }
+
     if (msg.type === 'join') {
       const { code, role } = msg;
       if (!code || (role !== 'sender' && role !== 'receiver')) return;
-      const room = getOrCreateRoom(code);
-      room[role] = ws;
-      joinedCode = code;
+
+      if (joinedCode && joinedRole) {
+        const prev = rooms.get(joinedCode);
+        if (prev) {
+          if (joinedRole === 'sender') prev.senders.delete(ws);
+          else prev.receivers.delete(ws);
+        }
+      }
+
+      const room = getOrCreateRoom(String(code));
+      room.lastActive = Date.now();
+      if (role === 'sender') room.senders.add(ws);
+      else room.receivers.add(ws);
+      joinedCode = String(code);
       joinedRole = role;
 
-      send(ws, { type: 'joined', role, code });
-      const peer = peerOf(room, role);
-      if (peer) {
-        send(ws, { type: 'peer-status', connected: true });
-        send(peer, { type: 'peer-status', connected: true });
-      }
+      send(ws, { type: 'joined', role, code: joinedCode, ...peerStatus(room) });
+      const status = { type: 'peer-status', connected: peerStatus(room).connected, ...peerStatus(room) };
+      broadcast(room.senders, status);
+      broadcast(room.receivers, status);
       return;
     }
 
     if (!joinedCode || !joinedRole) return;
     const room = rooms.get(joinedCode);
     if (!room) return;
-    const peer = peerOf(room, joinedRole);
+    room.lastActive = Date.now();
 
-    // Everything else (media / control / status / webrtc-*) is opaque relay
-    // traffic — the server doesn't interpret it, just forwards to whichever
-    // peer is in the room. Keeps the receiver and sender free to evolve
-    // their message shapes independently of this server. The webrtc-*
-    // types carry SDP offer/answer and ICE candidates for the live-camera
-    // stream (PRODUCT_PLAN-adjacent "filma → visas direkt på TV:n" feature) —
-    // this server never sees the actual video, only the signalling.
-    if (['media', 'control', 'status', 'webrtc-offer', 'webrtc-answer', 'webrtc-ice'].includes(msg.type)) {
-      send(peer, msg);
+    const targets = joinedRole === 'sender' ? room.receivers : room.senders;
+    if (['media', 'control', 'status', 'webrtc-offer', 'webrtc-answer', 'webrtc-ice', 'queue-update', 'group-event', 'pointer', 'draw'].includes(msg.type)) {
+      broadcast(targets, msg);
     }
   });
 
@@ -127,22 +139,24 @@ wss.on('connection', (ws) => {
     if (!joinedCode || !joinedRole) return;
     const room = rooms.get(joinedCode);
     if (!room) return;
-    room[joinedRole] = null;
-    const peer = peerOf(room, joinedRole);
-    send(peer, { type: 'peer-status', connected: false });
-    if (!room.sender && !room.receiver) rooms.delete(joinedCode);
+    if (joinedRole === 'sender') room.senders.delete(ws);
+    else room.receivers.delete(ws);
+    const status = { type: 'peer-status', connected: peerStatus(room).connected, ...peerStatus(room) };
+    broadcast(room.senders, status);
+    broadcast(room.receivers, status);
+    if (room.senders.size === 0 && room.receivers.size === 0) {
+      room.lastActive = Date.now();
+    }
   });
 });
 
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms) {
-    if (now - room.createdAt > ROOM_TTL_MS && !room.sender && !room.receiver) {
-      rooms.delete(code);
-    }
+    if (now - room.lastActive > ROOM_TTL_MS) rooms.delete(code);
   }
 }, 60 * 1000).unref();
 
 server.listen(PORT, () => {
-  console.log(`FredCast relay listening on :${PORT}`);
+  console.log(`FredCast relay v3 listening on :${PORT}`);
 });
