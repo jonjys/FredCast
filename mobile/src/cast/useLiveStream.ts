@@ -4,20 +4,15 @@ import { useCast, pwaReceiverAdapter } from './CastProvider';
 
 export type LiveStreamStatus = 'idle' | 'requesting-camera' | 'connecting' | 'live' | 'error';
 
-// Same public STUN server as receiver/index.html — only used to discover
-// NAT-mapped addresses, never carries video. Same-Wi-Fi ("hemma") only for
-// this first version; streaming across networks ("ute") needs a TURN relay
-// too, which is a separate (often paid) service — see PRODUCT_PLAN.md §9.
-const RTC_CONFIG: RTCConfiguration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+// Same public STUN as receiver/index.html — discovers NAT addresses only.
+// Same-Wi-Fi ("hemma") for this version; cross-network needs TURN.
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+};
 
 /**
- * "Filma → visas direkt på TV:n" — live camera streaming to the paired
- * PwaReceiverAdapter screen over WebRTC, signalled through the existing
- * relay (see relay/server.js webrtc-offer/webrtc-answer/webrtc-ice
- * handling and receiver/index.html's handleOffer). Web-only: relies on
- * browser-native getUserMedia/RTCPeerConnection, which react-native-web
- * exposes as-is — a native iOS/Android build would need react-native-webrtc
- * instead, out of scope until this app has a native build (see README).
+ * Live camera → paired PwaReceiver screen over WebRTC, signalled via relay.
+ * Web-only (browser getUserMedia / RTCPeerConnection).
  */
 export function useLiveStream() {
   const { connectedDevice } = useCast();
@@ -27,17 +22,48 @@ export function useLiveStream() {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const answerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteSetRef = useRef(false);
+
+  const clearAnswerTimeout = () => {
+    if (answerTimeoutRef.current) {
+      clearTimeout(answerTimeoutRef.current);
+      answerTimeoutRef.current = null;
+    }
+  };
 
   const stop = useCallback(() => {
-    if (connectedDevice) {
-      pwaReceiverAdapter.sendRaw(connectedDevice.id, { type: 'control', command: 'stop-live' });
-    }
+    clearAnswerTimeout();
     unsubscribeRef.current?.();
     unsubscribeRef.current = null;
-    pcRef.current?.close();
+    pendingIceRef.current = [];
+    remoteSetRef.current = false;
+
+    if (connectedDevice) {
+      try {
+        pwaReceiverAdapter.sendRaw(connectedDevice.id, { type: 'control', command: 'stop-live' });
+      } catch {
+        // Socket may already be closed — fine.
+      }
+    }
+
+    try {
+      pcRef.current?.close();
+    } catch {
+      /* ignore */
+    }
     pcRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+
+    streamRef.current?.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch {
+        /* ignore */
+      }
+    });
     streamRef.current = null;
+
     if (previewRef.current) previewRef.current.srcObject = null;
     setStatus('idle');
   }, [connectedDevice]);
@@ -55,13 +81,26 @@ export function useLiveStream() {
         return;
       }
 
+      // Clean previous session if any.
+      clearAnswerTimeout();
+      unsubscribeRef.current?.();
+      unsubscribeRef.current = null;
+      try {
+        pcRef.current?.close();
+      } catch {
+        /* ignore */
+      }
+      pcRef.current = null;
+      pendingIceRef.current = [];
+      remoteSetRef.current = false;
+
       setError(null);
       setStatus('requesting-camera');
       previewRef.current = previewEl;
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode },
+          video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: true,
         });
         streamRef.current = stream;
@@ -79,13 +118,23 @@ export function useLiveStream() {
 
         pc.onicecandidate = (event) => {
           if (event.candidate) {
-            pwaReceiverAdapter.sendRaw(connectedDevice.id, { type: 'webrtc-ice', candidate: event.candidate });
+            try {
+              pwaReceiverAdapter.sendRaw(connectedDevice.id, {
+                type: 'webrtc-ice',
+                candidate: event.candidate,
+              });
+            } catch {
+              /* socket gone */
+            }
           }
         };
 
         pc.onconnectionstatechange = () => {
-          if (pc.connectionState === 'connected') setStatus('live');
-          if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          if (pc.connectionState === 'connected') {
+            clearAnswerTimeout();
+            setStatus('live');
+          }
+          if (pc.connectionState === 'failed') {
             setError('Anslutningen till skärmen tappades.');
             setStatus('error');
           }
@@ -93,16 +142,54 @@ export function useLiveStream() {
 
         unsubscribeRef.current = pwaReceiverAdapter.onMessage(connectedDevice.id, (msg) => {
           if (msg.type === 'webrtc-answer' && msg.sdp) {
-            pc.setRemoteDescription(new RTCSessionDescription(msg.sdp as RTCSessionDescriptionInit)).catch(() => undefined);
+            pc
+              .setRemoteDescription(new RTCSessionDescription(msg.sdp as RTCSessionDescriptionInit))
+              .then(async () => {
+                remoteSetRef.current = true;
+                const buffered = pendingIceRef.current;
+                pendingIceRef.current = [];
+                for (const c of buffered) {
+                  try {
+                    await pc.addIceCandidate(new RTCIceCandidate(c));
+                  } catch {
+                    /* ignore bad candidate */
+                  }
+                }
+              })
+              .catch(() => undefined);
           }
           if (msg.type === 'webrtc-ice' && msg.candidate) {
-            pc.addIceCandidate(new RTCIceCandidate(msg.candidate as RTCIceCandidateInit)).catch(() => undefined);
+            const candidate = msg.candidate as RTCIceCandidateInit;
+            if (!remoteSetRef.current) {
+              pendingIceRef.current.push(candidate);
+              return;
+            }
+            pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => undefined);
           }
         });
 
-        const offer = await pc.createOffer();
+        // If TV never answers (tab closed / relay drop), fail clearly.
+        answerTimeoutRef.current = setTimeout(() => {
+          if (pcRef.current && pcRef.current.connectionState !== 'connected') {
+            setError('Skärmen svarade inte. Öppna receiver-sidan igen och starta om live.');
+            setStatus('error');
+            try {
+              pc.close();
+            } catch {
+              /* ignore */
+            }
+          }
+        }, 20000);
+
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: false,
+          offerToReceiveVideo: false,
+        });
         await pc.setLocalDescription(offer);
-        pwaReceiverAdapter.sendRaw(connectedDevice.id, { type: 'webrtc-offer', sdp: pc.localDescription });
+        pwaReceiverAdapter.sendRaw(connectedDevice.id, {
+          type: 'webrtc-offer',
+          sdp: pc.localDescription,
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Kunde inte starta kameran.');
         setStatus('error');
