@@ -4,15 +4,10 @@ import { CastAdapter, CastDevice, MediaItem, PlaybackCommand } from '../types';
  * The universal fallback adapter (PRODUCT_PLAN.md §8-9, MVP_BACKLOG.md Epic
  * 1 P1 & Epic 7) — pairs with a FredCast Receiver page (any browser: Smart
  * TV, Fire TV Silk, a laptop) via a short code, then sends media/control
- * commands over a plain WebSocket relay. Unlike Cast/DLNA discovery, this
- * adapter never finds devices passively — the user reads a code off the
- * screen and types it in, so devices only appear after `pairWithCode`
- * succeeds. That's why `startDiscovery` just registers the change listener
- * and emits whatever's already paired, rather than scanning anything.
+ * commands over a plain WebSocket relay.
  *
- * No native module dependency (plain WebSocket, available in RN and the
- * browser alike) — this is why it's the first adapter implemented for real
- * rather than left as a stub like GoogleCastAdapter/DlnaAdapter.
+ * Render free-tier relay can take 30–50s to wake after idle — pair timeout
+ * is intentionally long and surfaces that in the error message.
  */
 export class PwaReceiverAdapter implements CastAdapter {
   readonly protocol = 'pwa-receiver' as const;
@@ -21,7 +16,7 @@ export class PwaReceiverAdapter implements CastAdapter {
   private onChange: ((devices: CastDevice[]) => void) | null = null;
   private devices = new Map<string, CastDevice>();
   private sockets = new Map<string, WebSocket>();
-  /** Raw socket message listeners, keyed by device — used for WebRTC signalling (see startLiveStream). */
+  /** Raw socket message listeners, keyed by device — used for WebRTC signalling. */
   private messageListeners = new Map<string, Set<(msg: Record<string, unknown>) => void>>();
 
   constructor(relayUrl: string) {
@@ -37,31 +32,72 @@ export class PwaReceiverAdapter implements CastAdapter {
   }
 
   /**
-   * Pair with a receiver by the 6-digit code shown on its screen. Resolves
-   * once the relay confirms our side has joined the room (not once the TV
-   * has actually opened it — that arrives later as a peer-status message
-   * and flips the device from "connecting" to "ready").
+   * Pair with a receiver by the 6-digit code shown on its screen.
+   * Resolves once the relay confirms we joined the room. Peer readiness
+   * arrives later as peer-status and flips status connecting → ready.
    */
   pairWithCode(code: string): Promise<CastDevice> {
+    const digits = code.replace(/\D/g, '');
+    if (digits.length !== 6) {
+      return Promise.reject(new Error('Koden måste vara 6 siffror.'));
+    }
+
+    // Re-pairing the same code: drop the old socket first so we don't leak.
+    const deviceId = `pwa-${digits}`;
+    const existing = this.sockets.get(deviceId);
+    if (existing) {
+      try {
+        existing.close();
+      } catch {
+        /* ignore */
+      }
+      this.sockets.delete(deviceId);
+      this.messageListeners.delete(deviceId);
+    }
+
+    return this.openPairSocket(digits, deviceId, 0);
+  }
+
+  private openPairSocket(digits: string, deviceId: string, attempt: number): Promise<CastDevice> {
     return new Promise((resolve, reject) => {
-      const deviceId = `pwa-${code}`;
       const socket = new WebSocket(this.relayUrl);
       let settled = false;
+
+      // Render free tier cold start ≈ 30–50s; give it room, then one retry.
+      const timeoutMs = attempt === 0 ? 45000 : 25000;
 
       const timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
-          socket.close();
-          reject(new Error('Kunde inte nå FredCast-relayn. Kontrollera koden och din anslutning.'));
+          try {
+            socket.close();
+          } catch {
+            /* ignore */
+          }
+          if (attempt === 0) {
+            // One automatic retry — first attempt often just wakes the relay.
+            this.openPairSocket(digits, deviceId, 1).then(resolve, reject);
+            return;
+          }
+          reject(
+            new Error(
+              'Kunde inte nå FredCast-relayn (den kan ha sovit). Vänta 10 sek och försök igen med samma kod.',
+            ),
+          );
         }
-      }, 8000);
+      }, timeoutMs);
 
       socket.onopen = () => {
-        socket.send(JSON.stringify({ type: 'join', code, role: 'sender' }));
+        socket.send(JSON.stringify({ type: 'join', code: digits, role: 'sender' }));
       };
 
       socket.onmessage = (event) => {
-        const msg = JSON.parse(String(event.data));
+        let msg: Record<string, unknown>;
+        try {
+          msg = JSON.parse(String(event.data));
+        } catch {
+          return;
+        }
 
         if (msg.type === 'joined' && !settled) {
           settled = true;
@@ -69,7 +105,7 @@ export class PwaReceiverAdapter implements CastAdapter {
           this.sockets.set(deviceId, socket);
           const device: CastDevice = {
             id: deviceId,
-            name: `Skärm (kod ${code.slice(0, 3)} ${code.slice(3)})`,
+            name: `Skärm (kod ${digits.slice(0, 3)} ${digits.slice(3)})`,
             room: 'Ansluten via kod',
             type: 'tv',
             status: 'connecting',
@@ -84,13 +120,14 @@ export class PwaReceiverAdapter implements CastAdapter {
         if (msg.type === 'peer-status') {
           const device = this.devices.get(deviceId);
           if (device) {
-            this.devices.set(deviceId, { ...device, status: msg.connected ? 'ready' : 'connecting' });
+            this.devices.set(deviceId, {
+              ...device,
+              status: msg.connected ? 'ready' : 'connecting',
+            });
             this.emit();
           }
         }
 
-        // WebRTC signalling replies (webrtc-answer/webrtc-ice) from the
-        // receiver flow through here too — see startLiveStream/onMessage.
         this.messageListeners.get(deviceId)?.forEach((listener) => listener(msg));
       };
 
@@ -98,16 +135,25 @@ export class PwaReceiverAdapter implements CastAdapter {
         if (!settled) {
           settled = true;
           clearTimeout(timeout);
+          if (attempt === 0) {
+            this.openPairSocket(digits, deviceId, 1).then(resolve, reject);
+            return;
+          }
           reject(new Error('Kunde inte ansluta till relayn.'));
         }
       };
 
       socket.onclose = () => {
+        if (!settled) {
+          // Closed before join — treat as error path (timeout/retry handles it).
+          return;
+        }
         const device = this.devices.get(deviceId);
         if (device) {
           this.devices.set(deviceId, { ...device, status: 'unavailable' });
           this.emit();
         }
+        this.sockets.delete(deviceId);
       };
     });
   }
@@ -125,8 +171,7 @@ export class PwaReceiverAdapter implements CastAdapter {
   }
 
   async connect(_deviceId: string): Promise<void> {
-    // Pairing already establishes the connection in pairWithCode(); nothing
-    // further to do once the device exists in our map.
+    // Pairing already establishes the connection in pairWithCode().
   }
 
   async sendMedia(deviceId: string, item: MediaItem): Promise<void> {
@@ -139,19 +184,21 @@ export class PwaReceiverAdapter implements CastAdapter {
 
   async disconnect(deviceId: string): Promise<void> {
     const socket = this.sockets.get(deviceId);
-    socket?.close();
+    try {
+      socket?.close();
+    } catch {
+      /* ignore */
+    }
     this.sockets.delete(deviceId);
     this.devices.delete(deviceId);
     this.messageListeners.delete(deviceId);
     this.emit();
   }
 
-  /** Sends an arbitrary relay message (used for webrtc-offer/webrtc-ice signalling by useLiveStream). */
   sendRaw(deviceId: string, msg: Record<string, unknown>): void {
     this.socketFor(deviceId).send(JSON.stringify(msg));
   }
 
-  /** Subscribes to raw relay messages for a device (webrtc-answer/webrtc-ice replies). Returns an unsubscribe fn. */
   onMessage(deviceId: string, listener: (msg: Record<string, unknown>) => void): () => void {
     const set = this.messageListeners.get(deviceId) ?? new Set();
     set.add(listener);
