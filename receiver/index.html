@@ -46,9 +46,14 @@
   #status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
   #status .dot.on { background: var(--ready); }
   #filename {
-    position: fixed; bottom: 24px; left: 0; right: 0; text-align: center;
-    color: var(--text-dim); font-size: 0.9rem; z-index: 20;
+    position: fixed; bottom: 88px; left: 0; right: 0; text-align: center;
+    color: var(--text-dim); font-size: 0.9rem; z-index: 20; pointer-events: none;
   }
+  #queueBar {
+    position: fixed; bottom: 52px; left: 0; right: 0; text-align: center;
+    color: var(--text-dim); font-size: 0.85rem; z-index: 20; display: none;
+  }
+  #queueBar.show { display: block; }
   #liveBadge {
     position: fixed; top: 20px; left: 24px; display: none; align-items: center; gap: 6px;
     font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; color: #fff;
@@ -57,26 +62,67 @@
   #liveBadge .liveDot { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
   #liveBadge.on { display: flex; }
   #unmuteBtn {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%);
     display: none; align-items: center; gap: 8px; background: rgba(0,0,0,0.65);
     color: #fff; border: none; border-radius: 999px; padding: 10px 18px; font-size: 0.85rem; z-index: 25;
   }
   #unmuteBtn.show { display: flex; }
+  #groupBtn {
+    position: fixed; bottom: 16px; right: 16px; z-index: 30;
+    background: rgba(12,12,18,0.85); color: var(--text); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px; padding: 10px 14px; font-size: 0.8rem; cursor: pointer;
+  }
+  #groupModal {
+    display: none; position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,0.7); align-items: center; justify-content: center;
+  }
+  #groupModal.show { display: flex; }
+  #groupPanel {
+    background: #16161f; border-radius: 18px; padding: 24px; width: min(360px, 92vw);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  #groupPanel input {
+    width: 100%; font-size: 1.4rem; letter-spacing: 0.2em; text-align: center;
+    padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);
+    background: #0B0B10; color: #fff; margin: 12px 0;
+  }
+  #groupPanel button {
+    width: 100%; padding: 12px; border-radius: 12px; border: 0; background: var(--accent);
+    color: #fff; font-weight: 700; cursor: pointer;
+  }
+  #groupLabel {
+    position: fixed; top: 52px; left: 24px; z-index: 20; display: none;
+    font-size: 0.8rem; color: var(--text-dim);
+  }
+  #groupLabel.on { display: block; }
 </style>
 </head>
 <body>
   <div id="status"><span class="dot" id="statusDot"></span><span id="statusText">Ansluter…</span></div>
+  <div id="groupLabel"></div>
   <div id="stage">
     <div id="placeholder">
       <div id="logo">FredCast Receiver</div>
       <div id="qrWrap"></div>
       <div id="code">------</div>
-      <div id="hint">Skanna QR-koden med kameran på din telefon — eller öppna FredCast och skriv in koden ovan</div>
+      <div id="hint">Skanna QR med telefonen — eller skriv in koden i FredCast</div>
     </div>
   </div>
   <div id="filename"></div>
+  <div id="queueBar"></div>
   <div id="liveBadge"><span class="liveDot"></span>LIVE</div>
   <button id="unmuteBtn">🔇 Tryck för ljud</button>
+  <button id="groupBtn" type="button">Gruppkod</button>
+
+  <div id="groupModal">
+    <div id="groupPanel">
+      <div style="font-weight:700;margin-bottom:4px">Logga in med gruppkod</div>
+      <div style="color:var(--text-dim);font-size:0.85rem">Samma 6 siffror som i appen (t.ex. Midsommar)</div>
+      <input id="groupInput" inputmode="numeric" maxlength="6" placeholder="323891" />
+      <button type="button" id="groupJoinBtn">Anslut TV till grupp</button>
+      <button type="button" id="groupCancelBtn" style="background:transparent;color:var(--text-dim);margin-top:8px">Avbryt</button>
+    </div>
+  </div>
 
   <script src="./vendor/qrcode.js"></script>
   <script>
@@ -91,14 +137,19 @@
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const filenameEl = document.getElementById('filename');
+    const queueBarEl = document.getElementById('queueBar');
     const liveBadgeEl = document.getElementById('liveBadge');
     const unmuteBtnEl = document.getElementById('unmuteBtn');
+    const groupLabelEl = document.getElementById('groupLabel');
+    const groupModal = document.getElementById('groupModal');
+    const groupInput = document.getElementById('groupInput');
 
     let ws;
     let code = params.get('code');
     let pc = null;
     let pendingIce = [];
     let remoteReady = false;
+    let groupName = null;
 
     const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
@@ -254,7 +305,7 @@
         video.controls = true;
         video.style.cssText = 'max-width:100%;max-height:100%;';
         stageEl.appendChild(video);
-      } else if (item.kind === 'link' || (item.uri && /^https?:\/\/i.test(item.uri) && !item.uri.startsWith('data:'))) {
+      } else if (item.kind === 'link' || (item.uri && /^https?:\/\//i.test(item.uri) && !item.uri.startsWith('data:'))) {
         const iframe = document.createElement('iframe');
         iframe.src = item.uri;
         iframe.style.cssText = 'width:100%;height:100%;border:0;background:#fff;';
@@ -264,6 +315,17 @@
         img.src = item.uri;
         stageEl.appendChild(img);
       }
+    }
+
+    function updateQueue(msg) {
+      if (!msg || !msg.length) {
+        queueBarEl.classList.remove('show');
+        queueBarEl.textContent = '';
+        return;
+      }
+      var next = msg.next && msg.next.name ? msg.next.name : '';
+      queueBarEl.textContent = msg.length + ' i kö' + (next ? ' · Nästa: ' + next : '');
+      queueBarEl.classList.add('show');
     }
 
     function connect() {
@@ -282,6 +344,11 @@
           codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
           renderQr(appUrl + '/?connectCode=' + code);
           statusText.textContent = 'Väntar på telefon…';
+          if (msg.group && msg.group.name) {
+            groupName = msg.group.name;
+            groupLabelEl.textContent = '👥 ' + groupName + (msg.group.members ? ' · ' + msg.group.members + ' med' : '');
+            groupLabelEl.classList.add('on');
+          }
         }
 
         if (msg.type === 'peer-status') {
@@ -290,10 +357,12 @@
         }
 
         if (msg.type === 'media') renderMedia(msg.item);
+        if (msg.type === 'queue') updateQueue(msg);
 
         if (msg.type === 'control') {
           const video = stageEl.querySelector('video');
           if (msg.command === 'stop-live') { stopLiveStream(); return; }
+          if (msg.command === 'next') return;
           if (!video) return;
           if (msg.command === 'play') video.play();
           if (msg.command === 'pause') video.pause();
@@ -315,6 +384,22 @@
 
       ws.onerror = () => ws.close();
     }
+
+    document.getElementById('groupBtn').onclick = () => {
+      groupModal.classList.add('show');
+      groupInput.focus();
+    };
+    document.getElementById('groupCancelBtn').onclick = () => groupModal.classList.remove('show');
+    document.getElementById('groupJoinBtn').onclick = () => {
+      var digits = String(groupInput.value || '').replace(/\D/g, '').slice(0, 6);
+      if (digits.length !== 6) return;
+      code = digits;
+      groupModal.classList.remove('show');
+      try { if (ws) ws.close(); } catch (e) {}
+      codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
+      renderQr(appUrl + '/?connectCode=' + code);
+      connect();
+    };
 
     ensureCode().then((c) => {
       code = String(c).replace(/\D/g, '').slice(0, 6);
