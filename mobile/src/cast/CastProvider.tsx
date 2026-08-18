@@ -23,16 +23,17 @@ export interface QueueEntry {
   addedAt: number;
 }
 
+export type CastOptions = { force?: boolean };
+
 interface CastContextValue {
   devices: CastDevice[];
-  /** Favorites pinned as their own group, then the rest grouped by room (PRODUCT_PLAN.md §5). */
   groupedDevices: DeviceGroup[];
   connectedDevice: CastDevice | null;
   connecting: boolean;
   connect: (deviceId: string) => Promise<void>;
   disconnect: () => Promise<void>;
   toggleFavorite: (deviceId: string) => void;
-  cast: (item: MediaItem, deviceId?: string) => Promise<void>;
+  cast: (item: MediaItem, deviceId?: string, opts?: CastOptions) => Promise<void>;
   pairWithCode: (code: string) => Promise<void>;
   pairing: boolean;
   sending: boolean;
@@ -40,7 +41,6 @@ interface CastContextValue {
   controlPlayback: (command: 'play' | 'pause' | 'next' | 'previous') => void;
   history: HistoryEntry[];
   lastError: string | null;
-  /** Playback queue — items waiting after current. */
   queue: QueueEntry[];
   enqueue: (item: MediaItem) => void;
   removeFromQueue: (id: string) => void;
@@ -51,7 +51,6 @@ interface CastContextValue {
 
 const CastContext = createContext<CastContextValue | null>(null);
 
-// Single engine instance for the app's lifetime.
 export const pwaReceiverAdapter = new PwaReceiverAdapter(RELAY_WS_URL);
 const engine = new CastEngine([new MockAdapter(), pwaReceiverAdapter]);
 
@@ -68,6 +67,31 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const defaultsAppliedTo = useRef<Set<string>>(new Set());
+  const queueRef = useRef<QueueEntry[]>([]);
+  const connectedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+  useEffect(() => {
+    connectedRef.current = connectedDeviceId;
+  }, [connectedDeviceId]);
+
+  const syncQueueToReceiver = useCallback((entries: QueueEntry[]) => {
+    const id = connectedRef.current;
+    if (!id) return;
+    try {
+      pwaReceiverAdapter.sendRaw(id, {
+        type: 'queue',
+        length: entries.length,
+        next: entries[0]
+          ? { name: entries[0].item.name, kind: entries[0].item.kind }
+          : null,
+      });
+    } catch {
+      /* socket may be reconnecting */
+    }
+  }, []);
 
   useEffect(() => {
     engine.start();
@@ -108,14 +132,12 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   const groupedDevices = useMemo<DeviceGroup[]>(() => {
     const favorites = decoratedDevices.filter((d) => d.isFavorite);
     const rest = decoratedDevices.filter((d) => !d.isFavorite);
-
     const byRoom = new Map<string, CastDevice[]>();
     rest.forEach((d) => {
       const list = byRoom.get(d.room) ?? [];
       list.push(d);
       byRoom.set(d.room, list);
     });
-
     const groups: DeviceGroup[] = [];
     if (favorites.length) groups.push({ room: 'Favoriter', devices: favorites });
     byRoom.forEach((list, room) => groups.push({ room, devices: list }));
@@ -171,13 +193,34 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const enqueue = useCallback(
+    (item: MediaItem) => {
+      setQueue((prev) => {
+        const next = [
+          ...prev,
+          { id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, item, addedAt: Date.now() },
+        ];
+        setTimeout(() => syncQueueToReceiver(next), 0);
+        return next;
+      });
+    },
+    [syncQueueToReceiver],
+  );
+
   const cast = useCallback(
-    async (item: MediaItem, deviceId?: string) => {
+    async (item: MediaItem, deviceId?: string, opts?: CastOptions) => {
       const targetId = deviceId ?? connectedDeviceId;
       if (!targetId) {
         setLastError('Ingen skärm vald.');
         return;
       }
+
+      // Auto-enqueue when something is already playing (unless force)
+      if (!opts?.force && playback) {
+        enqueue(item);
+        return;
+      }
+
       setLastError(null);
       setSending(true);
       try {
@@ -204,48 +247,58 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
             });
           }, 1000);
         }
+
+        syncQueueToReceiver(queueRef.current);
       } catch (e) {
         setLastError(e instanceof Error ? e.message : 'Kunde inte nå skärmen just nu.');
       } finally {
         setSending(false);
       }
     },
-    [connectedDeviceId, decoratedDevices],
+    [connectedDeviceId, decoratedDevices, playback, enqueue, syncQueueToReceiver],
   );
 
-  const enqueue = useCallback((item: MediaItem) => {
-    setQueue((prev) => [
-      ...prev,
-      { id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, item, addedAt: Date.now() },
-    ]);
-  }, []);
+  const removeFromQueue = useCallback(
+    (id: string) => {
+      setQueue((prev) => {
+        const next = prev.filter((q) => q.id !== id);
+        setTimeout(() => syncQueueToReceiver(next), 0);
+        return next;
+      });
+    },
+    [syncQueueToReceiver],
+  );
 
-  const removeFromQueue = useCallback((id: string) => {
-    setQueue((prev) => prev.filter((q) => q.id !== id));
-  }, []);
+  const clearQueue = useCallback(() => {
+    setQueue([]);
+    syncQueueToReceiver([]);
+  }, [syncQueueToReceiver]);
 
-  const clearQueue = useCallback(() => setQueue([]), []);
-
-  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
-    setQueue((prev) => {
-      if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  }, []);
+  const reorderQueue = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      setQueue((prev) => {
+        if (fromIndex < 0 || fromIndex >= prev.length || toIndex < 0 || toIndex >= prev.length) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        setTimeout(() => syncQueueToReceiver(next), 0);
+        return next;
+      });
+    },
+    [syncQueueToReceiver],
+  );
 
   const playNextFromQueue = useCallback(async () => {
     setQueue((prev) => {
       if (prev.length === 0) return prev;
       const [first, ...rest] = prev;
       setTimeout(() => {
-        void cast(first.item);
+        void cast(first.item, undefined, { force: true });
+        syncQueueToReceiver(rest);
       }, 0);
       return rest;
     });
-  }, [cast]);
+  }, [cast, syncQueueToReceiver]);
 
   const controlPlayback = useCallback(
     (command: 'play' | 'pause' | 'next' | 'previous') => {
