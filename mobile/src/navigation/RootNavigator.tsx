@@ -14,6 +14,7 @@ import { QrConnectScreen } from '../screens/QrConnectScreen';
 import { QrScanScreen } from '../screens/QrScanScreen';
 import { LiveScreen } from '../screens/LiveScreen';
 import { QueueScreen } from '../screens/QueueScreen';
+import { GroupsScreen } from '../screens/GroupsScreen';
 import { useAutoConnectFromUrl } from '../cast/useAutoConnectFromUrl';
 import { AutoConnectBanner } from '../components/AutoConnectBanner';
 import { CastHeaderButton } from '../components/CastHeaderButton';
@@ -25,8 +26,9 @@ const TAB_ICON: Record<string, IconName> = {
   Idag: 'home',
   Bibliotek: 'grid',
   Skärmar: 'tv',
+  Kö: 'doc',
+  Grupper: 'user',
   Inställningar: 'gear',
-  Kö: 'list',
 };
 
 export function RootNavigator() {
@@ -61,19 +63,29 @@ export function RootNavigator() {
             tabBarInactiveTintColor: t.colors.textFaint,
             tabBarStyle: { backgroundColor: t.colors.bg, borderTopColor: t.colors.border },
             tabBarLabelStyle: { fontSize: 10 },
-            tabBarIcon: ({ color, size }) => <Icon name={TAB_ICON[route.name] || 'doc'} size={size * 0.82} color={color} />,
+            tabBarIcon: ({ color, size }) => (
+              <Icon name={TAB_ICON[route.name] || 'doc'} size={size * 0.82} color={color} />
+            ),
           })}
         >
           <Tab.Screen name="Idag">
             {({ navigation }) => (
-              <TodayScreen onOpenLibrary={() => navigation.navigate('Bibliotek')} onOpenLive={() => setLiveOpen(true)} />
+              <TodayScreen
+                onOpenLibrary={() => navigation.navigate('Bibliotek')}
+                onOpenLive={() => setLiveOpen(true)}
+              />
             )}
           </Tab.Screen>
           <Tab.Screen name="Bibliotek">
             {() => <LibraryScreen onOpenNowPlaying={() => setNowPlayingOpen(true)} />}
           </Tab.Screen>
-          <Tab.Screen name="Skärmar">{() => <DevicesScreen onOpenQr={() => setQrOpen(true)} onOpenScan={() => setScanOpen(true)} />}</Tab.Screen>
+          <Tab.Screen name="Skärmar">
+            {() => (
+              <DevicesScreen onOpenQr={() => setQrOpen(true)} onOpenScan={() => setScanOpen(true)} />
+            )}
+          </Tab.Screen>
           <Tab.Screen name="Kö" component={QueueScreen} />
+          <Tab.Screen name="Grupper" component={GroupsScreen} />
           <Tab.Screen name="Inställningar" component={SettingsScreen} />
         </Tab.Navigator>
       </NavigationContainer>
