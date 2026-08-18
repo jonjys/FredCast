@@ -120,10 +120,20 @@ export class PwaReceiverAdapter implements CastAdapter {
           this.sockets.set(deviceId, socket);
           this.storageSet(digits, deviceId);
           this.startHeartbeat(deviceId);
+          const aliases = (() => {
+            try {
+              if (typeof localStorage === 'undefined') return {} as Record<string, { name?: string; room?: string }>;
+              const raw = localStorage.getItem('fredcast_device_alias_v3');
+              return raw ? (JSON.parse(raw) as Record<string, { name?: string; room?: string }>) : {};
+            } catch {
+              return {};
+            }
+          })();
+          const alias = aliases[deviceId];
           const device: CastDevice = {
             id: deviceId,
-            name: `Skärm (kod ${digits.slice(0, 3)} ${digits.slice(3)})`,
-            room: 'Ansluten via kod',
+            name: alias?.name?.trim() || 'TV',
+            room: alias?.room?.trim() || 'Vardagsrum',
             type: 'tv',
             status: 'connecting',
             protocol: 'pwa-receiver',

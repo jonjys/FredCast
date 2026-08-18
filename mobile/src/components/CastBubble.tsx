@@ -1,15 +1,34 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeProvider';
 import { useCast } from '../cast/CastProvider';
+import { Icon } from '../icons/Icon';
+
+function formatTime(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+}
+
+function kindLabel(kind: string, queueLen: number): string {
+  if (kind === 'image' && queueLen > 0) return 'Bildspel';
+  if (kind === 'image') return 'Bild';
+  if (kind === 'video') return 'Video';
+  if (kind === 'file') return 'Fil';
+  if (kind === 'link') return 'Länk';
+  return 'Cast';
+}
 
 /**
- * Persistent status pill shown on every tab while something is casting
- * (PRODUCT_PLAN.md §3) — same idea as Spotify's now-playing bar.
+ * Persistent mini-controller on every tab (PRODUCT_PLAN.md §3).
+ * Surface #17161D · ready #35D28A · 8pt-grid · soft radius.
  */
-export function CastBubble({ onPress }: { onPress: () => void }) {
+export function CastBubble({ onPress, tabBarHeight = 56 }: { onPress: () => void; tabBarHeight?: number }) {
   const t = useTheme();
-  const { playback, connectedDevice } = useCast();
+  const insets = useSafeAreaInsets();
+  const { playback, connectedDevice, controlPlayback, queue } = useCast();
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -23,31 +42,103 @@ export function CastBubble({ onPress }: { onPress: () => void }) {
     return () => loop.stop();
   }, [pulse]);
 
-  if (!playback || !connectedDevice) return null;
+  if (!connectedDevice && !playback) return null;
+
+  const room = playback?.device.room || connectedDevice?.room || 'Skärm';
+  const title = playback?.item.name || 'Redo';
+  const kind = playback ? kindLabel(playback.item.kind, queue.length) : 'Ansluten';
+  const clock =
+    playback && playback.durationMs > 0
+      ? `${formatTime(playback.positionMs)} / ${formatTime(playback.durationMs)}`
+      : null;
 
   return (
-    <Pressable onPress={onPress} style={[styles.bubble, { backgroundColor: t.colors.surface, borderColor: t.colors.border }]}>
-      <Animated.View style={[styles.dot, { backgroundColor: t.colors.ready, opacity: pulse }]} />
-      <View style={[styles.thumb, { backgroundColor: t.colors.surface2 }]} />
-      <Text style={{ color: t.colors.text, fontSize: 12, flexShrink: 1 }} numberOfLines={1}>
-        Sänder till <Text style={{ fontWeight: '700' }}>{connectedDevice.name}</Text>
-      </Text>
-    </Pressable>
+    <View
+      pointerEvents="box-none"
+      style={[styles.wrap, { bottom: tabBarHeight + Math.max(insets.bottom, 0) }]}
+    >
+      <View style={[styles.bubble, { backgroundColor: t.colors.surface, borderColor: t.colors.border }]}>
+        <Pressable onPress={onPress} style={styles.main} accessibilityRole="button">
+          <Animated.View style={[styles.dot, { backgroundColor: t.colors.ready, opacity: pulse }]} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.eyebrow, { color: t.colors.textFaint }]} numberOfLines={1}>
+              Nu castas
+            </Text>
+            <Text style={[styles.line, { color: t.colors.text }]} numberOfLines={1}>
+              {title}
+              {' — '}
+              {kind}
+              {' · '}
+              {room}
+              {clock ? ` · ${clock}` : ''}
+            </Text>
+          </View>
+        </Pressable>
+        {playback ? (
+          <View style={styles.actions}>
+            <Pressable
+              onPress={() => controlPlayback(playback.isPlaying ? 'pause' : 'play')}
+              hitSlop={10}
+              style={[styles.iconBtn, { backgroundColor: t.colors.surface2 }]}
+            >
+              <Icon name={playback.isPlaying ? 'pause' : 'play'} size={14} color={t.colors.text} />
+            </Pressable>
+            <Pressable
+              onPress={() => controlPlayback('next')}
+              hitSlop={10}
+              style={[styles.iconBtn, { backgroundColor: t.colors.surface2 }]}
+            >
+              <Icon name="next" size={14} color={t.colors.text} />
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
+export const CAST_BUBBLE_RESERVE = 64;
+
 const styles = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    zIndex: 20,
+  },
   bubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 8,
+    gap: 8,
   },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  thumb: { width: 22, height: 22, borderRadius: 6 },
+  main: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  eyebrow: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  line: { fontSize: 12, fontWeight: '600' },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  actions: { flexDirection: 'row', gap: 6 },
+  iconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

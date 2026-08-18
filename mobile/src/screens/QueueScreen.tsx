@@ -95,7 +95,7 @@ export function QueueScreen() {
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 18, paddingBottom: 40 },
+  body: { padding: 18, paddingBottom: 96 },
   empty: {
     borderWidth: 1,
     borderStyle: 'dashed',

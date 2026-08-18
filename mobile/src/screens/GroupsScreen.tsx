@@ -3,55 +3,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useTheme } from '../theme/ThemeProvider';
 import { useCast } from '../cast/CastProvider';
 import { RELAY_HTTP_URL } from '../cast/config';
-
-const STORAGE_KEY = 'fredcast_group_v3';
-
-export type StoredGroup = {
-  code: string;
-  name: string;
-  nickname: string;
-  role: 'admin' | 'member';
-  token: string;
-  savedAt: number;
-};
-
-function loadGroup(): StoredGroup | null {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const g = JSON.parse(raw) as StoredGroup;
-    if (!g?.code || Date.now() - g.savedAt > 30 * 24 * 60 * 60 * 1000) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return g;
-  } catch {
-    return null;
-  }
-}
-
-function saveGroup(g: StoredGroup) {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(g));
-  } catch {
-    /* ignore */
-  }
-}
-
-function clearGroup() {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
+import { StoredGroup, clearGroup, formatGroupCode, loadGroup, saveGroup } from '../cast/groupStorage';
 
 /**
  * Grupper — 6-siffrig kod + nickname. INGEN Clerk / email / sign-in.
  * Ex: "Midsommar 2026" → kod 323891 → dela koden.
  */
-export function GroupsScreen() {
+export function GroupsScreen({ onChanged }: { onChanged?: () => void }) {
   const t = useTheme();
   const { pairWithCode, connectedDevice } = useCast();
   const [group, setGroup] = useState<StoredGroup | null>(null);
@@ -66,6 +24,12 @@ export function GroupsScreen() {
   useEffect(() => {
     setGroup(loadGroup());
   }, []);
+
+  const persist = (g: StoredGroup) => {
+    saveGroup(g);
+    setGroup(g);
+    onChanged?.();
+  };
 
   const createGroup = useCallback(async () => {
     const n = name.trim();
@@ -84,24 +48,22 @@ export function GroupsScreen() {
       });
       const data = await res.json();
       if (!res.ok || !data.code) throw new Error(data.error || 'Kunde inte skapa grupp');
-      const g: StoredGroup = {
+      persist({
         code: String(data.code),
         name: data.name || n,
         nickname: nick,
         role: 'admin',
         token: data.admin_token || data.token || '',
         savedAt: Date.now(),
-      };
-      saveGroup(g);
-      setGroup(g);
+      });
       setMode('home');
-      setInfo(`Grupp skapad. Dela koden ${g.code.slice(0, 3)} ${g.code.slice(3)}`);
+      setInfo(`Grupp skapad. Dela koden ${formatGroupCode(String(data.code))}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nätverksfel mot relay');
     } finally {
       setBusy(false);
     }
-  }, [name, nickname]);
+  }, [name, nickname, onChanged]);
 
   const joinGroup = useCallback(async () => {
     const digits = code.replace(/\D/g, '').slice(0, 6);
@@ -120,24 +82,22 @@ export function GroupsScreen() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Kunde inte gå med');
-      const g: StoredGroup = {
+      persist({
         code: digits,
         name: data.name || 'Grupp',
         nickname: nick,
         role: 'member',
         token: data.member_token || data.token || '',
         savedAt: Date.now(),
-      };
-      saveGroup(g);
-      setGroup(g);
+      });
       setMode('home');
-      setInfo(`Med i ${g.name}`);
+      setInfo(`Med i ${data.name || 'grupp'}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Nätverksfel mot relay');
     } finally {
       setBusy(false);
     }
-  }, [code, nickname]);
+  }, [code, nickname, onChanged]);
 
   const linkTv = useCallback(async () => {
     if (!group) return;
@@ -157,6 +117,7 @@ export function GroupsScreen() {
     clearGroup();
     setGroup(null);
     setInfo(null);
+    onChanged?.();
   };
 
   return (
@@ -187,14 +148,14 @@ export function GroupsScreen() {
                 fontWeight: '700',
               }}
             >
-              {group.code.slice(0, 3)} {group.code.slice(3)}
+              {formatGroupCode(group.code)}
             </Text>
             <Text style={{ color: t.colors.textDim, fontSize: 13 }}>
               Du är {group.nickname} ({group.role === 'admin' ? 'admin' : 'medlem'})
             </Text>
             {connectedDevice ? (
               <Text style={{ color: t.colors.textDim, fontSize: 12, marginTop: 6 }}>
-                🟢 TV: {connectedDevice.name}
+                TV: {connectedDevice.room} → {connectedDevice.name}
               </Text>
             ) : null}
             <Pressable
@@ -202,11 +163,7 @@ export function GroupsScreen() {
               disabled={busy}
               style={[styles.btn, { backgroundColor: t.colors.accent, marginTop: 14 }]}
             >
-              {busy ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Koppla TV till denna kod</Text>
-              )}
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Koppla TV till denna kod</Text>}
             </Pressable>
             <Pressable onPress={leave} style={{ paddingVertical: 12, alignItems: 'center' }}>
               <Text style={{ color: t.colors.textDim, fontSize: 13 }}>Lämna grupp</Text>
@@ -280,7 +237,10 @@ export function GroupsScreen() {
               keyboardType="number-pad"
               maxLength={7}
               placeholderTextColor={t.colors.textFaint}
-              style={[styles.input, { color: t.colors.text, borderColor: t.colors.border, backgroundColor: t.colors.bg, letterSpacing: 4, fontWeight: '700' }]}
+              style={[
+                styles.input,
+                { color: t.colors.text, borderColor: t.colors.border, backgroundColor: t.colors.bg, letterSpacing: 4, fontWeight: '700' },
+              ]}
             />
             <Text style={styles.label}>Ditt nickname</Text>
             <TextInput

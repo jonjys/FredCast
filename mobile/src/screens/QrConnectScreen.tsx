@@ -43,8 +43,8 @@ export function QrConnectScreen({ visible, onClose }: { visible: boolean; onClos
         </Pressable>
 
         <Text style={[styles.help, { color: t.colors.textDim }]}>
-          Öppna <Text style={{ color: t.colors.text, fontWeight: '700' }}>fred-cast.vercel.app/receiver</Text> på
-          TV:n/datorn och skriv in de 6 siffrorna. Eller skanna QR-koden med telefonens kamera.
+          Anslut med kod 482 019 → fredcast.app/connect → funkar även om ni är på olika nätverk.
+          Öppna mottagaren på TV:n och skriv in de 6 siffrorna, eller skanna QR-koden.
         </Text>
 
         <TextInput

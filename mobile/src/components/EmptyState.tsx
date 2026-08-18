@@ -20,7 +20,9 @@ export function EmptyState({ title, subtitle, onPressQr }: Props) {
           </View>
         </View>
       </View>
-      <Text style={[t.type.title, { color: t.colors.text, marginTop: 22, marginBottom: 6 }]}>{title}</Text>
+      <Text style={[t.type.title, { color: t.colors.text, marginTop: 22, marginBottom: 6, textAlign: 'center' }]}>
+        {title}
+      </Text>
       <Text style={[styles.subtitle, { color: t.colors.textDim }]}>{subtitle}</Text>
       {onPressQr ? (
         <Pressable
@@ -36,12 +38,12 @@ export function EmptyState({ title, subtitle, onPressQr }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  wrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 28 },
   ring: { borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   ringOuter: { width: 96, height: 96 },
   ringMiddle: { width: 66, height: 66 },
   ringInner: { width: 38, height: 38 },
-  subtitle: { fontSize: 13, textAlign: 'center', maxWidth: 220, marginBottom: 22 },
+  subtitle: { fontSize: 14, textAlign: 'center', maxWidth: 300, marginBottom: 22, lineHeight: 21 },
   qrBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16 },
   qrMini: { width: 22, height: 22, borderRadius: 4, opacity: 0.9 },
 });

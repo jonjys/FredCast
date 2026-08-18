@@ -4,7 +4,6 @@ import { useTheme } from '../theme/ThemeProvider';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { PhotoGrid, GridItem } from '../components/PhotoGrid';
 import { CastSheet } from '../components/CastSheet';
-import { CastBubble } from '../components/CastBubble';
 import { Icon } from '../icons/Icon';
 import { mockFiles, mockPhotos, mockVideo } from '../data/mockMedia';
 import { pickImageFromLibrary, pickVideoFromLibrary, pickDocumentFile, MediaTooLargeError } from '../media/pickers';
@@ -189,7 +188,6 @@ export function LibraryScreen({ onOpenNowPlaying }: { onOpenNowPlaying: () => vo
         )}
       </ScrollView>
 
-      <CastBubble onPress={onOpenNowPlaying} />
       <CastSheet item={selected} onClose={() => setSelected(null)} />
     </View>
   );
@@ -214,7 +212,7 @@ function AddButton({ label, onPress, loading }: { label: string; onPress: () => 
 }
 
 const styles = StyleSheet.create({
-  body: { padding: 18, paddingTop: 8, paddingBottom: 8 },
+  body: { padding: 20, paddingTop: 8, paddingBottom: 96 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   fileIcon: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   addBtn: {

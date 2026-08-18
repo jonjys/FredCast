@@ -3,6 +3,7 @@ import { CastEngine } from './CastEngine';
 import { MockAdapter } from './adapters/MockAdapter';
 import { PwaReceiverAdapter } from './adapters/PwaReceiverAdapter';
 import { RELAY_WS_URL } from './config';
+import { applyDeviceAlias, loadAliases, saveAlias, AliasMap } from './deviceAlias';
 import { CastDevice, MediaItem, PlaybackState } from './types';
 
 export interface DeviceGroup {
@@ -33,6 +34,7 @@ interface CastContextValue {
   connect: (deviceId: string) => Promise<void>;
   disconnect: () => Promise<void>;
   toggleFavorite: (deviceId: string) => void;
+  renameDevice: (deviceId: string, alias: { name?: string; room?: string }) => void;
   cast: (item: MediaItem, deviceId?: string, opts?: CastOptions) => Promise<void>;
   pairWithCode: (code: string) => Promise<void>;
   pairing: boolean;
@@ -57,6 +59,7 @@ const engine = new CastEngine([new MockAdapter(), pwaReceiverAdapter]);
 export function CastProvider({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = useState<CastDevice[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [aliases, setAliases] = useState<AliasMap>(() => loadAliases());
   const [connectedDeviceId, setConnectedDeviceId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [pairing, setPairing] = useState(false);
@@ -125,8 +128,11 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const decoratedDevices = useMemo<CastDevice[]>(
-    () => devices.map((d) => ({ ...d, isFavorite: favoriteIds.has(d.id) })),
-    [devices, favoriteIds],
+    () =>
+      devices.map((d) =>
+        applyDeviceAlias({ ...d, isFavorite: favoriteIds.has(d.id) }, aliases),
+      ),
+    [devices, favoriteIds, aliases],
   );
 
   const groupedDevices = useMemo<DeviceGroup[]>(() => {
@@ -191,6 +197,10 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
       else next.add(deviceId);
       return next;
     });
+  }, []);
+
+  const renameDevice = useCallback((deviceId: string, alias: { name?: string; room?: string }) => {
+    setAliases(saveAlias(deviceId, alias));
   }, []);
 
   const enqueue = useCallback(
@@ -323,6 +333,7 @@ export function CastProvider({ children }: { children: React.ReactNode }) {
     connect,
     disconnect,
     toggleFavorite,
+    renameDevice,
     cast,
     pairWithCode,
     pairing,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -19,6 +19,7 @@ import { useAutoConnectFromUrl } from '../cast/useAutoConnectFromUrl';
 import { AutoConnectBanner } from '../components/AutoConnectBanner';
 import { CastHeaderButton } from '../components/CastHeaderButton';
 import { ConnectToSheet } from '../components/ConnectToSheet';
+import { CastBubble } from '../components/CastBubble';
 
 const Tab = createBottomTabNavigator();
 
@@ -26,8 +27,6 @@ const TAB_ICON: Record<string, IconName> = {
   Idag: 'home',
   Bibliotek: 'grid',
   Skärmar: 'tv',
-  Kö: 'doc',
-  Grupper: 'user',
   Inställningar: 'gear',
 };
 
@@ -38,8 +37,12 @@ export function RootNavigator() {
   const [scanOpen, setScanOpen] = useState(false);
   const [connectToOpen, setConnectToOpen] = useState(false);
   const [liveOpen, setLiveOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const [groupsTick, setGroupsTick] = useState(0);
   const autoConnectStatus = useAutoConnectFromUrl();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = 52 + Math.max(insets.bottom, 8);
 
   const navTheme = {
     ...(t.scheme === 'dark' ? DarkTheme : DefaultTheme),
@@ -61,8 +64,14 @@ export function RootNavigator() {
             headerShown: false,
             tabBarActiveTintColor: t.colors.accent,
             tabBarInactiveTintColor: t.colors.textFaint,
-            tabBarStyle: { backgroundColor: t.colors.bg, borderTopColor: t.colors.border },
-            tabBarLabelStyle: { fontSize: 10 },
+            tabBarStyle: {
+              backgroundColor: t.colors.bg,
+              borderTopColor: t.colors.border,
+              height: tabBarHeight,
+              paddingTop: 6,
+              paddingBottom: Math.max(insets.bottom, 8),
+            },
+            tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
             tabBarIcon: ({ color, size }) => (
               <Icon name={TAB_ICON[route.name] || 'doc'} size={size * 0.82} color={color} />
             ),
@@ -73,6 +82,11 @@ export function RootNavigator() {
               <TodayScreen
                 onOpenLibrary={() => navigation.navigate('Bibliotek')}
                 onOpenLive={() => setLiveOpen(true)}
+                onOpenDevices={() => navigation.navigate('Skärmar')}
+                onOpenQr={() => setQrOpen(true)}
+                onOpenGroups={() => setGroupsOpen(true)}
+                onOpenNowPlaying={() => setNowPlayingOpen(true)}
+                groupsTick={groupsTick}
               />
             )}
           </Tab.Screen>
@@ -81,14 +95,19 @@ export function RootNavigator() {
           </Tab.Screen>
           <Tab.Screen name="Skärmar">
             {() => (
-              <DevicesScreen onOpenQr={() => setQrOpen(true)} onOpenScan={() => setScanOpen(true)} />
+              <DevicesScreen
+                onOpenQr={() => setQrOpen(true)}
+                onOpenScan={() => setScanOpen(true)}
+                onOpenQueue={() => setQueueOpen(true)}
+                onOpenGroups={() => setGroupsOpen(true)}
+              />
             )}
           </Tab.Screen>
-          <Tab.Screen name="Kö" component={QueueScreen} />
-          <Tab.Screen name="Grupper" component={GroupsScreen} />
           <Tab.Screen name="Inställningar" component={SettingsScreen} />
         </Tab.Navigator>
       </NavigationContainer>
+
+      <CastBubble onPress={() => setNowPlayingOpen(true)} tabBarHeight={tabBarHeight} />
 
       <View style={[styles.headerOverlay, { top: insets.top + 10 }]} pointerEvents="box-none">
         <CastHeaderButton onPress={() => setConnectToOpen(true)} />
@@ -109,6 +128,28 @@ export function RootNavigator() {
         onClose={() => setConnectToOpen(false)}
         onAddScreen={() => setQrOpen(true)}
       />
+
+      <Modal visible={queueOpen} animationType="slide" onRequestClose={() => setQueueOpen(false)} presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: t.colors.bg, paddingTop: 12 }}>
+          <Pressable onPress={() => setQueueOpen(false)} style={styles.sheetClose} hitSlop={12}>
+            <Text style={{ color: t.colors.textDim, fontWeight: '600' }}>Stäng</Text>
+          </Pressable>
+          <QueueScreen />
+        </View>
+      </Modal>
+
+      <Modal visible={groupsOpen} animationType="slide" onRequestClose={() => setGroupsOpen(false)} presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: t.colors.bg, paddingTop: 12 }}>
+          <Pressable onPress={() => setGroupsOpen(false)} style={styles.sheetClose} hitSlop={12}>
+            <Text style={{ color: t.colors.textDim, fontWeight: '600' }}>Stäng</Text>
+          </Pressable>
+          <GroupsScreen
+            onChanged={() => {
+              setGroupsTick((n) => n + 1);
+            }}
+          />
+        </View>
+      </Modal>
     </>
   );
 }
@@ -127,4 +168,5 @@ const styles = StyleSheet.create({
     right: 0,
     height: 34,
   },
+  sheetClose: { paddingHorizontal: 20, paddingVertical: 8, alignSelf: 'flex-end' },
 });
