@@ -15,16 +15,16 @@ type Props = {
   onClose: () => void;
 };
 
-/** Bottom sheet shown when the user taps a piece of content (PRODUCT_PLAN.md §6). */
+/** Bottom sheet — Visa nu / Lägg i kö (PRODUCT_PLAN.md §6). */
 export function CastSheet({ item, onClose }: Props) {
   const t = useTheme();
-  const { connectedDevice, groupedDevices, cast, sending, lastError } = useCast();
+  const { connectedDevice, groupedDevices, cast, enqueue, sending, lastError, playback } = useCast();
   const [picking, setPicking] = useState(false);
 
   if (!item) return null;
 
   const handleCastTo = async (deviceId: string) => {
-    await cast(item, deviceId);
+    await cast(item, deviceId, { force: true });
     setPicking(false);
     onClose();
   };
@@ -34,7 +34,13 @@ export function CastSheet({ item, onClose }: Props) {
       setPicking(true);
       return;
     }
-    await cast(item, connectedDevice.id);
+    // Explicit "Visa nu" always forces play
+    await cast(item, connectedDevice.id, { force: true });
+    onClose();
+  };
+
+  const handleEnqueue = () => {
+    enqueue(item);
     onClose();
   };
 
@@ -73,18 +79,32 @@ export function CastSheet({ item, onClose }: Props) {
               {item.name}
               {item.sizeLabel ? ` · ${item.sizeLabel}` : ''}
             </Text>
+            {playback ? (
+              <Text style={{ color: t.colors.textDim, fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
+                Spelar nu: {playback.item.name} — ny cast läggs i kö om du inte väljer Visa nu
+              </Text>
+            ) : null}
             <PrimaryButton
-              label={connectedDevice ? `Visa på ${connectedDevice.name}` : 'Välj en skärm'}
+              label={connectedDevice ? `Visa nu på ${connectedDevice.name}` : 'Välj en skärm'}
               icon="tv"
               onPress={handlePrimary}
               loading={sending}
             />
             {connectedDevice ? (
-              <Pressable onPress={() => setPicking(true)} style={{ paddingVertical: 10, alignItems: 'center' }}>
+              <Pressable onPress={handleEnqueue} style={{ paddingVertical: 12, alignItems: 'center' }}>
+                <Text style={{ color: t.colors.accent, fontSize: 15, fontWeight: '700' }}>
+                  {playback ? 'Lägg i kö' : 'Lägg i kö (spela sen)'}
+                </Text>
+              </Pressable>
+            ) : null}
+            {connectedDevice ? (
+              <Pressable onPress={() => setPicking(true)} style={{ paddingVertical: 6, alignItems: 'center' }}>
                 <Text style={{ color: t.colors.textDim, fontSize: 13 }}>Byt skärm</Text>
               </Pressable>
             ) : null}
-            {lastError ? <Text style={{ color: t.colors.danger, fontSize: 12, textAlign: 'center' }}>{lastError}</Text> : null}
+            {lastError ? (
+              <Text style={{ color: t.colors.danger, fontSize: 12, textAlign: 'center' }}>{lastError}</Text>
+            ) : null}
           </>
         )}
       </View>
