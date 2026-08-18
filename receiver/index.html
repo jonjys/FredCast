@@ -342,7 +342,7 @@
         if (msg.type === 'joined') {
           code = String(msg.code);
           codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
-          renderQr(appUrl + '/?connectCode=' + code);
+          renderQr(appUrl + '/connect?connectCode=' + code);
           statusText.textContent = 'Väntar på telefon…';
           if (msg.group && msg.group.name) {
             groupName = msg.group.name;
@@ -397,7 +397,7 @@
       groupModal.classList.remove('show');
       try { if (ws) ws.close(); } catch (e) {}
       codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
-      renderQr(appUrl + '/?connectCode=' + code);
+      renderQr(appUrl + '/connect?connectCode=' + code);
       connect();
     };
 
@@ -405,12 +405,12 @@
       code = String(c).replace(/\D/g, '').slice(0, 6);
       if (code.length !== 6) code = localCode();
       codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
-      renderQr(appUrl + '/?connectCode=' + code);
+      renderQr(appUrl + '/connect?connectCode=' + code);
       connect();
     }).catch(() => {
       code = localCode();
       codeEl.textContent = code.slice(0, 3) + ' ' + code.slice(3);
-      renderQr(appUrl + '/?connectCode=' + code);
+      renderQr(appUrl + '/connect?connectCode=' + code);
       connect();
     });
   </script>

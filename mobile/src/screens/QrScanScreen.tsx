@@ -68,7 +68,7 @@ export function QrScanScreen({ visible, onClose }: { visible: boolean; onClose: 
             const codes = await detector.detect(videoRef.current);
             if (codes && codes.length) {
               const raw = String(codes[0].rawValue || '');
-              const match = raw.match(/connectCode=(\d{6})/) || raw.match(/\b(\d{6})\b/);
+              const match = raw.match(/connectCode=(\d{6})/) || raw.match(/\/connect\/(\d{6})/) || raw.match(/\b(\d{6})\b/);
               if (match) {
                 setStatus('connecting');
                 stream.getTracks().forEach((tr) => tr.stop());

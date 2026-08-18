@@ -23,7 +23,7 @@ export function AutoConnectBanner({ status }: { status: AutoConnectStatus }) {
     return () => clearTimeout(timer);
   }, [status]);
 
-  if (status === 'idle' || dismissed) return null;
+  if (status === 'idle' || status === 'connect-page' || dismissed) return null;
 
   return (
     <View style={[styles.banner, { backgroundColor: t.colors.surface, borderColor: t.colors.border }]}>

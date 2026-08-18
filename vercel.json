@@ -1,8 +1,22 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "mobile/dist",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://fred-platform.vercel.app"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/receiver", "destination": "/receiver/index.html" },
-    { "source": "/((?!receiver/).*)", "destination": "/index.html" }
+    { "source": "/api/health", "destination": "/api/health.json" },
+    { "source": "/connect", "destination": "/index.html" },
+    { "source": "/connect/:path*", "destination": "/index.html" },
+    { "source": "/((?!receiver/|api/).*)", "destination": "/index.html" }
   ]
 }

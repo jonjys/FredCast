@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
@@ -43,6 +43,10 @@ export function RootNavigator() {
   const autoConnectStatus = useAutoConnectFromUrl();
   const insets = useSafeAreaInsets();
   const tabBarHeight = 52 + Math.max(insets.bottom, 8);
+
+  useEffect(() => {
+    if (autoConnectStatus === 'connect-page') setQrOpen(true);
+  }, [autoConnectStatus]);
 
   const navTheme = {
     ...(t.scheme === 'dark' ? DarkTheme : DefaultTheme),
@@ -113,7 +117,7 @@ export function RootNavigator() {
         <CastHeaderButton onPress={() => setConnectToOpen(true)} />
       </View>
 
-      {autoConnectStatus !== 'idle' ? (
+      {autoConnectStatus !== 'idle' && autoConnectStatus !== 'connect-page' ? (
         <View style={[styles.autoConnectOverlay, { top: insets.top + 54 }]} pointerEvents="box-none">
           <AutoConnectBanner status={autoConnectStatus} />
         </View>

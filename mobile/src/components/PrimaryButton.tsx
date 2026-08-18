@@ -38,7 +38,9 @@ export function PrimaryButton({ label, onPress, icon, loading, disabled, variant
       ) : (
         <>
           {icon ? <Icon name={icon} size={16} color={textColor} /> : null}
-          <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+          <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
+            {label}
+          </Text>
         </>
       )}
     </Pressable>
@@ -52,8 +54,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 13,
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     borderRadius: 999,
   },
-  label: { fontSize: 15, fontWeight: '700' },
+  label: { fontSize: 15, fontWeight: '700', flexShrink: 1 },
 });

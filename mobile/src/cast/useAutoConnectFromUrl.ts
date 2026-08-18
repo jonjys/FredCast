@@ -2,18 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { useCast } from './CastProvider';
 
-export type AutoConnectStatus = 'idle' | 'connecting' | 'connected' | 'error';
+export type AutoConnectStatus = 'idle' | 'connecting' | 'connected' | 'error' | 'connect-page';
+
+function extractConnectCode(): { code: string | null; isConnectRoute: boolean } {
+  if (typeof window === 'undefined') return { code: null, isConnectRoute: false };
+  const { pathname, search, hash } = window.location;
+  const params = new URLSearchParams(search);
+  if (hash && hash.includes('=')) {
+    const hp = new URLSearchParams(hash.replace(/^#/, ''));
+    hp.forEach((v, k) => {
+      if (!params.has(k)) params.set(k, v);
+    });
+  }
+
+  const fromQuery = (params.get('connectCode') || params.get('code') || '').replace(/\D/g, '');
+  const pathMatch = pathname.match(/\/connect\/(\d{6})\b/);
+  const fromPath = pathMatch ? pathMatch[1] : '';
+  const code = (fromQuery.length === 6 ? fromQuery : fromPath.length === 6 ? fromPath : '').slice(0, 6) || null;
+  const isConnectRoute = pathname === '/connect' || pathname.startsWith('/connect/');
+  return { code, isConnectRoute };
+}
 
 /**
- * Scanning the QR code on the receiver's TV screen (receiver/index.html)
- * opens the web app with `?connectCode=XXXXXX` in the URL — this hook reads
- * that once at startup and pairs automatically via the same
- * PwaReceiverAdapter path as manually typing the code in QrConnectScreen,
- * so a phone with no app installed can cast to a screen in zero taps after
- * the camera scan (PRODUCT_PLAN.md §9 QR fallback).
- *
- * Web-only: native builds don't receive query params the same way, and the
- * QR/manual-code flow already covers native until deep linking is wired up.
+ * /connect and ?connectCode=XXXXXX — QR 482 019 flow, standalone.
+ * Also used when FredCast is iframed from fred-platform /core/cast.
  */
 export function useAutoConnectFromUrl(): AutoConnectStatus {
   const { pairWithCode } = useCast();
@@ -24,17 +36,20 @@ export function useAutoConnectFromUrl(): AutoConnectStatus {
     if (Platform.OS !== 'web' || attempted.current) return;
     if (typeof window === 'undefined') return;
 
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('connectCode')?.replace(/\D/g, '');
-    if (!code || code.length !== 6) return;
+    const { code, isConnectRoute } = extractConnectCode();
+    if (!code || code.length !== 6) {
+      if (isConnectRoute) setStatus('connect-page');
+      return;
+    }
 
     attempted.current = true;
     setStatus('connecting');
 
-    // Strip the param immediately so a refresh doesn't re-trigger pairing
-    // against a code the receiver may have already rotated away from.
+    const params = new URLSearchParams(window.location.search);
     params.delete('connectCode');
-    const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '');
+    params.delete('code');
+    const keepPath = isConnectRoute ? '/connect' : window.location.pathname;
+    const cleanUrl = keepPath + (params.toString() ? `?${params}` : '');
     window.history.replaceState({}, '', cleanUrl);
 
     pairWithCode(code)
